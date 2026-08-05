@@ -63,13 +63,14 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.MapTileProviderBasic
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.tileprovider.tilesource.XYTileSource
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.CustomZoomButtonsController.Visibility
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.TilesOverlay
+import java.io.File
 
-// ---------- Renkler & Tema ----------
 val SirenBackground = Color(0xFF0A101C)
 val SirenPanel = Color(0xFF0D1626)
 val SirenCard = Color(0xFF111C30)
@@ -93,7 +94,6 @@ fun SirenTheme(content: @Composable () -> Unit) {
     )
 }
 
-// ---------- Sekmeler ----------
 enum class SirenTab(val title: String, val icon: ImageVector) {
     Harita("Harita", Icons.Filled.Map),
     Rotalar("Rotalar", Icons.Filled.AltRoute),
@@ -106,24 +106,12 @@ enum class SirenTab(val title: String, val icon: ImageVector) {
     Ayarlar("Ayarlar", Icons.Filled.Settings)
 }
 
-// ---------- Harita Kaynakları ----------
-private val CartoVoyager = XYTileSource(
-    "CartoVoyager", 1, 20, 256, ".png",
-    arrayOf(
-        "https://a.basemaps.cartocdn.com/rastertiles/voyager",
-        "https://b.basemaps.cartocdn.com/rastertiles/voyager",
-        "https://c.basemaps.cartocdn.com/rastertiles/voyager"
-    ),
-    "© OpenStreetMap contributors © CARTO"
-)
-
 private val OpenSeaMapSource = XYTileSource(
     "OpenSeaMap", 1, 19, 256, ".png",
     arrayOf("https://tiles.openseamap.org/seamark"),
     "© OpenSeaMap"
 )
 
-// ---------- Activity ----------
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -131,7 +119,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// ---------- Ana Yerleşim ----------
 @Composable
 fun SirenRoot() {
     var selected by remember { mutableStateOf(SirenTab.Harita) }
@@ -155,7 +142,6 @@ fun ComingSoon(title: String) {
     }
 }
 
-// ---------- Sol Menü ----------
 @Composable
 fun SideNav(selected: SirenTab, onSelect: (SirenTab) -> Unit) {
     Column(
@@ -216,25 +202,31 @@ private fun OfflineBadge() {
     }
 }
 
-// ---------- Harita Ekranı (GERÇEK HARİTA) ----------
 @Composable
 fun MapScreen() {
     val context = LocalContext.current
 
     val mapView = remember {
-        Configuration.getInstance().load(context, context.getSharedPreferences("osmdroid", 0))
-        Configuration.getInstance().userAgentValue = "SIREN/0.2.0"
+        val cfg = Configuration.getInstance()
+        cfg.load(context, context.getSharedPreferences("osmdroid", 0))
+        cfg.osmdroidBasePath = File(context.filesDir, "osmdroid")
+        cfg.osmdroidTileCache = File(context.filesDir, "osmdroid/tiles")
+        cfg.userAgentValue = "SIREN/0.2.1"
+
         MapView(context).apply {
-            setTileSource(CartoVoyager)
+            setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
             zoomController.setVisibility(Visibility.NEVER)
             controller.setZoom(12.5)
-            controller.setCenter(GeoPoint(36.9582, 27.4428)) // Bodrum
-            overlays.add(
-                TilesOverlay(MapTileProviderBasic(context, OpenSeaMapSource), context).apply {
-                    loadingBackgroundColor = android.graphics.Color.TRANSPARENT
-                }
-            )
+            controller.setCenter(GeoPoint(36.9582, 27.4428))
+            runCatching {
+                overlays.add(
+                    TilesOverlay(MapTileProviderBasic(context, OpenSeaMapSource), context).apply {
+                        loadingBackgroundColor = android.graphics.Color.TRANSPARENT
+                    }
+                )
+            }
+            invalidate()
         }
     }
 
@@ -346,7 +338,6 @@ private fun BoxScope.ScaleBar() {
     }
 }
 
-// ---------- Sağ Panel ----------
 @Composable
 fun RightPanel(modifier: Modifier = Modifier) {
     Column(
