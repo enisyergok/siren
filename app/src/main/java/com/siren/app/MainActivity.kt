@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.AltRoute
 import androidx.compose.material.icons.filled.Anchor
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsBoat
 import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -80,6 +81,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
+import org.osmdroid.events.MapEventsOverlay
+import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.tileprovider.MapTileProviderBasic
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.tileprovider.tilesource.XYTileSource
@@ -181,11 +184,15 @@ fun SirenRoot() {
     val speedKts = remember { mutableStateOf<Float?>(null) }
     val courseDeg = remember { mutableStateOf<Float?>(null) }
     val follow = remember { mutableStateOf(true) }
-    val dao = remember { AppDatabase.getInstance(context).trackDao() }
+    val db = remember { AppDatabase.getInstance(context) }
+    val dao = db.trackDao()
+    val wpDao = db.waypointDao()
     val scope = rememberCoroutineScope()
     val recording = remember { mutableStateOf(false) }
     val currentTrackId = remember { mutableStateOf<String?>(null) }
     val trackPoints = remember { mutableStateOf<List<GeoPoint>>(emptyList()) }
+    val waypoints by wpDao.observeAll().collectAsState(initial = emptyList())
+
     var hasLocPerm by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
@@ -230,6 +237,7 @@ fun SirenRoot() {
     }
     LaunchedEffect(hasLocPerm) { if (hasLocPerm) tracker.start() else tracker.stop() }
     DisposableEffect(Unit) { onDispose { tracker.stop() } }
+
     val onRecordToggle: () -> Unit = {
         if (!recording.value) {
             val id = UUID.randomUUID().toString()
@@ -245,12 +253,28 @@ fun SirenRoot() {
             recording.value = false
         }
     }
+
+    val onAddWaypoint: (GeoPoint) -> Unit = { p ->
+        scope.launch {
+            wpDao.insert(
+                WaypointEntity(
+                    id = UUID.randomUUID().toString(),
+                    name = "WP " + SimpleDateFormat("HH:mm", Locale("tr")).format(Date()),
+                    lat = p.latitude,
+                    lon = p.longitude,
+                    createdAt = System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
     Box(Modifier.fillMaxSize().background(SirenBackground)) {
         Row(Modifier.fillMaxSize()) {
             Spacer(Modifier.width(230.dp))
             Box(Modifier.weight(1f).clipToBounds()) {
                 when (selected) {
-                    SirenTab.Harita -> MapScreen(pos, speedKts, courseDeg, follow, trackPoints, recording, onRecordToggle)
+                    SirenTab.Harita -> MapScreen(pos, speedKts, courseDeg, follow, trackPoints, recording, onRecordToggle, waypoints, onAddWaypoint)
+                    SirenTab.Waypointler -> WaypointsScreen(wpDao)
                     SirenTab.Izler -> TracksScreen(dao)
                     else -> ComingSoon(selected.title)
                 }
@@ -268,6 +292,42 @@ fun ComingSoon(title: String) {
             Text(title, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = SirenTextPrimary)
             Spacer(Modifier.height(6.dp))
             Text("Bu modul yakinda eklenecek", color = SirenTextSecondary)
+        }
+    }
+}
+
+@Composable
+fun WaypointsScreen(dao: WaypointDao) {
+    val wps by dao.observeAll().collectAsState(initial = emptyList())
+    val scope = rememberCoroutineScope()
+    Column(Modifier.fillMaxSize().background(SirenBackground).padding(24.dp)) {
+        Text("WAYPOINT'LER", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = SirenTextPrimary)
+        Spacer(Modifier.height(6.dp))
+        Text("Haritada bir noktaya UZUN BASARAK waypoint ekleyebilirsin.", color = SirenTextSecondary, fontSize = 12.sp)
+        Spacer(Modifier.height(16.dp))
+        if (wps.isEmpty()) {
+            Text("Henuz waypoint yok.", color = SirenTextSecondary)
+        }
+        wps.forEach { wp ->
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 6.dp).clip(RoundedCornerShape(12.dp))
+                    .background(SirenCard).padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Filled.Place, null, tint = SirenTrackYellow)
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(wp.name, color = SirenTextPrimary, fontWeight = FontWeight.SemiBold)
+                    Text("%.5f, %.5f".format(wp.lat, wp.lon), color = SirenTextSecondary, fontSize = 12.sp)
+                }
+                Spacer(Modifier.weight(1f))
+                Icon(
+                    Icons.Filled.Delete, null, tint = SirenRed,
+                    modifier = Modifier.size(20.dp).clickable {
+                        scope.launch { dao.delete(wp.id) }
+                    }
+                )
+            }
         }
     }
 }
@@ -364,7 +424,9 @@ fun MapScreen(
     follow: MutableState<Boolean>,
     trackPoints: MutableState<List<GeoPoint>>,
     recording: MutableState<Boolean>,
-    onRecordToggle: () -> Unit
+    onRecordToggle: () -> Unit,
+    waypoints: List<WaypointEntity>,
+    onAddWaypoint: (GeoPoint) -> Unit
 ) {
     val context = LocalContext.current
     val mapView = remember {
@@ -372,7 +434,7 @@ fun MapScreen(
         cfg.load(context, context.getSharedPreferences("osmdroid", 0))
         cfg.osmdroidBasePath = File(context.filesDir, "osmdroid")
         cfg.osmdroidTileCache = File(context.filesDir, "osmdroid/tiles")
-        cfg.userAgentValue = "SIREN/0.4.0"
+        cfg.userAgentValue = "SIREN/0.5.0"
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
@@ -391,6 +453,18 @@ fun MapScreen(
             invalidate()
         }
     }
+
+    LaunchedEffect(Unit) {
+        mapView.overlays.add(MapEventsOverlay(object : MapEventsReceiver {
+            override fun singleTapConfirmedHelper(p: GeoPoint): Boolean = false
+            override fun longPressHelper(p: GeoPoint): Boolean {
+                onAddWaypoint(p)
+                return true
+            }
+        }))
+        mapView.invalidate()
+    }
+
     val trackLine = remember {
         Polyline(mapView).apply {
             outlinePaint.color = android.graphics.Color.parseColor("#F2C94C")
@@ -399,6 +473,7 @@ fun MapScreen(
     }
     LaunchedEffect(Unit) { mapView.overlays.add(trackLine); mapView.invalidate() }
     LaunchedEffect(trackPoints.value) { trackLine.setPoints(trackPoints.value); mapView.invalidate() }
+
     val boatMarker = remember {
         Marker(mapView).apply {
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
@@ -418,7 +493,25 @@ fun MapScreen(
             mapView.invalidate()
         }
     }
+
+    val wpMarkers = remember { mutableListOf<Marker>() }
+    LaunchedEffect(waypoints) {
+        wpMarkers.forEach { mapView.overlays.remove(it) }
+        wpMarkers.clear()
+        waypoints.forEach { wp ->
+            val m = Marker(mapView).apply {
+                position = GeoPoint(wp.lat, wp.lon)
+                title = wp.name
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+            }
+            wpMarkers.add(m)
+            mapView.overlays.add(m)
+        }
+        mapView.invalidate()
+    }
+
     DisposableEffect(Unit) { onDispose { mapView.onDetach() } }
+
     Box(Modifier.fillMaxSize().clipToBounds()) {
         AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
         MapTopBar()

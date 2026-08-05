@@ -11,6 +11,8 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "tracks")
@@ -44,6 +46,15 @@ data class TrackPointEntity(
     val heading: Double
 )
 
+@Entity(tableName = "waypoints")
+data class WaypointEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val lat: Double,
+    val lon: Double,
+    val createdAt: Long
+)
+
 @Dao
 interface TrackDao {
     @Insert
@@ -59,9 +70,38 @@ interface TrackDao {
     fun observeTracks(): Flow<List<TrackEntity>>
 }
 
-@Database(entities = [TrackEntity::class, TrackPointEntity::class], version = 1)
+@Dao
+interface WaypointDao {
+    @Insert
+    suspend fun insert(wp: WaypointEntity)
+
+    @Query("SELECT * FROM waypoints ORDER BY createdAt DESC")
+    fun observeAll(): Flow<List<WaypointEntity>>
+
+    @Query("DELETE FROM waypoints WHERE id = :id")
+    suspend fun delete(id: String)
+}
+
+val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS waypoints (" +
+                "id TEXT NOT NULL PRIMARY KEY, " +
+                "name TEXT NOT NULL, " +
+                "lat REAL NOT NULL, " +
+                "lon REAL NOT NULL, " +
+                "createdAt INTEGER NOT NULL)"
+        )
+    }
+}
+
+@Database(
+    entities = [TrackEntity::class, TrackPointEntity::class, WaypointEntity::class],
+    version = 2
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun trackDao(): TrackDao
+    abstract fun waypointDao(): WaypointDao
 
     companion object {
         @Volatile
@@ -73,7 +113,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "siren.db"
-                ).build()
+                ).addMigrations(MIGRATION_1_2).build()
             }
     }
 }
