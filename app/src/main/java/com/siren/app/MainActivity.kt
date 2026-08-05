@@ -1,4 +1,3 @@
-
 package com.siren.app
 
 import android.os.Bundle
@@ -46,6 +45,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,9 +56,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.MapTileProviderBasic
+import org.osmdroid.tileprovider.tilesource.XYTileSource
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.CustomZoomButtonsController.Visibility
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.TilesOverlay
 
 // ---------- Renkler & Tema ----------
 val SirenBackground = Color(0xFF0A101C)
@@ -96,6 +105,23 @@ enum class SirenTab(val title: String, val icon: ImageVector) {
     Sonar("Sonar", Icons.Filled.Radar),
     Ayarlar("Ayarlar", Icons.Filled.Settings)
 }
+
+// ---------- Harita Kaynakları ----------
+private val CartoVoyager = XYTileSource(
+    "CartoVoyager", 1, 20, 256, ".png",
+    arrayOf(
+        "https://a.basemaps.cartocdn.com/rastertiles/voyager",
+        "https://b.basemaps.cartocdn.com/rastertiles/voyager",
+        "https://c.basemaps.cartocdn.com/rastertiles/voyager"
+    ),
+    "© OpenStreetMap contributors © CARTO"
+)
+
+private val OpenSeaMapSource = XYTileSource(
+    "OpenSeaMap", 1, 19, 256, ".png",
+    arrayOf("https://tiles.openseamap.org/seamark"),
+    "© OpenSeaMap"
+)
 
 // ---------- Activity ----------
 class MainActivity : ComponentActivity() {
@@ -190,14 +216,33 @@ private fun OfflineBadge() {
     }
 }
 
-// ---------- Harita Ekranı ----------
+// ---------- Harita Ekranı (GERÇEK HARİTA) ----------
 @Composable
 fun MapScreen() {
-    Box(
-        Modifier.fillMaxSize().background(
-            Brush.radialGradient(listOf(Color(0xFF1B4A7A), Color(0xFF0E2C50), Color(0xFF0A1E38)))
-        )
-    ) {
+    val context = LocalContext.current
+
+    val mapView = remember {
+        Configuration.getInstance().userAgentValue = "SIREN/0.2.0"
+        MapView(context).apply {
+            setTileSource(CartoVoyager)
+            setMultiTouchControls(true)
+            zoomController.setVisibility(Visibility.NEVER)
+            controller.setZoom(12.5)
+            controller.setCenter(GeoPoint(36.9582, 27.4428)) // Bodrum
+            overlays.add(
+                TilesOverlay(MapTileProviderBasic(context, OpenSeaMapSource), context).apply {
+                    loadingBackgroundColor = android.graphics.Color.TRANSPARENT
+                }
+            )
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { mapView.onDetach() }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
         MapTopBar()
         MapControls()
         BottomDataBar()
@@ -388,5 +433,3 @@ private fun SonarCard() {
         }
     }
 }
-
-
