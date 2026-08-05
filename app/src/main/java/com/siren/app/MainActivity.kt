@@ -64,6 +64,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -217,16 +218,19 @@ fun SirenRoot() {
 
     DisposableEffect(Unit) { onDispose { tracker.stop() } }
 
-    Row(Modifier.fillMaxSize().background(SirenBackground)) {
-        SideNav(selected = selected, onSelect = { selected = it })
-        Box(Modifier.weight(1f)) {
-            if (selected == SirenTab.Harita) {
-                MapScreen(pos, speedKts, courseDeg, follow)
-            } else {
-                ComingSoon(selected.title)
+    Box(Modifier.fillMaxSize().background(SirenBackground)) {
+        Row(Modifier.fillMaxSize()) {
+            Spacer(Modifier.width(230.dp))
+            Box(Modifier.weight(1f).clipToBounds()) {
+                if (selected == SirenTab.Harita) {
+                    MapScreen(pos, speedKts, courseDeg, follow)
+                } else {
+                    ComingSoon(selected.title)
+                }
             }
+            RightPanel(Modifier.width(260.dp).fillMaxHeight(), pos, speedKts, courseDeg)
         }
-        RightPanel(Modifier.width(260.dp).fillMaxHeight(), pos, speedKts, courseDeg)
+        SideNav(selected = selected, onSelect = { selected = it })
     }
 }
 
@@ -315,12 +319,11 @@ fun MapScreen(
         cfg.load(context, context.getSharedPreferences("osmdroid", 0))
         cfg.osmdroidBasePath = File(context.filesDir, "osmdroid")
         cfg.osmdroidTileCache = File(context.filesDir, "osmdroid/tiles")
-        cfg.userAgentValue = "SIREN/0.3.1"
+        cfg.userAgentValue = "SIREN/0.3.2"
 
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
-            setTilesScaledToDpi(true)
             zoomController.setVisibility(Visibility.NEVER)
             controller.setZoom(14.0)
             controller.setCenter(GeoPoint(36.9582, 27.4428))
@@ -362,7 +365,7 @@ fun MapScreen(
 
     DisposableEffect(Unit) { onDispose { mapView.onDetach() } }
 
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().clipToBounds()) {
         AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
         MapTopBar()
         MapControls(
