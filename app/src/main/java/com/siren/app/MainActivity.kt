@@ -1,8 +1,16 @@
 package com.siren.app
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -46,6 +54,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,6 +71,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.MapTileProviderBasic
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -68,6 +79,7 @@ import org.osmdroid.tileprovider.tilesource.XYTileSource
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.CustomZoomButtonsController.Visibility
 import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.TilesOverlay
 import java.io.File
 
@@ -112,6 +124,44 @@ private val OpenSeaMapSource = XYTileSource(
     "© OpenSeaMap"
 )
 
+// ---------- GPS ----------
+class GpsTracker(
+    context: Context,
+    private val onLocation: (Location) -> Unit
+) : LocationListener {
+
+    private val manager =
+        context.applicationContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+
+    fun start() {
+        runCatching {
+            manager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, this)
+            manager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1000L, 0f, this)
+        }
+    }
+
+    fun stop() {
+        runCatching { manager.removeUpdates(this) }
+    }
+
+    override fun onLocationChanged(location: Location) {
+        onLocation(location)
+    }
+}
+
+fun formatCoords(lat: Double, lon: Double): Pair<String, String> {
+    val la = Math.abs(lat)
+    val lo = Math.abs(lon)
+    val ld = la.toInt()
+    val lm = (la - ld) * 60
+    val od = lo.toInt()
+    val om = (lo - od) * 60
+    val latH = if (lat >= 0) "N" else "S"
+    val lonH = if (lon >= 0) "E" else "W"
+    return ("%02d° %06.3f' %s".format(ld, lm, latH)) to ("%03d° %06.3f' %s".format(od, om, lonH))
+}
+
+// ---------- Activity ----------
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -119,15 +169,66 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// ---------- Ana Yerleşim ----------
 @Composable
 fun SirenRoot() {
+    val context = LocalContext.current
     var selected by remember { mutableStateOf(SirenTab.Harita) }
+
+    val pos = remember { mutableStateOf<GeoPoint?>(null) }
+    val speedKts = remember { mutableStateOf<Float?>(null) }
+    val courseDeg = remember { mutableStateOf<Float?>(null) }
+    val follow = remember { mutableStateOf(true) }
+
+    var hasLocPerm by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context, Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    val permLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        hasLocPerm = result[Manifest.permission.ACCESS_FINE_LOCATION] == true
+    }
+
+    val tracker = remember {
+        GpsTracker(context) { loc ->
+            pos.value = GeoPoint(loc.latitude, loc.longitude)
+            speedKts.value = loc.speed * 1.94384f
+            courseDeg.value = loc.bearing
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (!hasLocPerm) {
+            permLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
+
+    LaunchedEffect(hasLocPerm) {
+        if (hasLocPerm) tracker.start() else tracker.stop()
+    }
+
+    DisposableEffect(Unit) { onDispose { tracker.stop() } }
+
     Row(Modifier.fillMaxSize().background(SirenBackground)) {
         SideNav(selected = selected, onSelect = { selected = it })
         Box(Modifier.weight(1f)) {
-            if (selected == SirenTab.Harita) MapScreen() else ComingSoon(selected.title)
+            if (selected == SirenTab.Harita) {
+                MapScreen(pos, speedKts, courseDeg, follow)
+            } else {
+                ComingSoon(selected.title)
+            }
         }
-        RightPanel(Modifier.width(260.dp).fillMaxHeight())
+        RightPanel(Modifier.width(260.dp).fillMaxHeight(), pos, speedKts, courseDeg)
     }
 }
 
@@ -142,6 +243,7 @@ fun ComingSoon(title: String) {
     }
 }
 
+// ---------- Sol Menü ----------
 @Composable
 fun SideNav(selected: SirenTab, onSelect: (SirenTab) -> Unit) {
     Column(
@@ -202,8 +304,14 @@ private fun OfflineBadge() {
     }
 }
 
+// ---------- Harita ----------
 @Composable
-fun MapScreen() {
+fun MapScreen(
+    pos: MutableState<GeoPoint?>,
+    speedKts: MutableState<Float?>,
+    courseDeg: MutableState<Float?>,
+    follow: MutableState<Boolean>
+) {
     val context = LocalContext.current
 
     val mapView = remember {
@@ -211,13 +319,13 @@ fun MapScreen() {
         cfg.load(context, context.getSharedPreferences("osmdroid", 0))
         cfg.osmdroidBasePath = File(context.filesDir, "osmdroid")
         cfg.osmdroidTileCache = File(context.filesDir, "osmdroid/tiles")
-        cfg.userAgentValue = "SIREN/0.2.1"
+        cfg.userAgentValue = "SIREN/0.3.0"
 
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
             zoomController.setVisibility(Visibility.NEVER)
-            controller.setZoom(12.5)
+            controller.setZoom(14.0)
             controller.setCenter(GeoPoint(36.9582, 27.4428))
             runCatching {
                 overlays.add(
@@ -230,15 +338,37 @@ fun MapScreen() {
         }
     }
 
-    DisposableEffect(Unit) {
-        onDispose { mapView.onDetach() }
+    val boatMarker = remember {
+        Marker(mapView).apply {
+            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+            icon = ContextCompat.getDrawable(context, R.drawable.boat)
+            title = "SİREN"
+        }
     }
+
+    LaunchedEffect(pos.value) {
+        pos.value?.let { p ->
+            if (!mapView.overlays.contains(boatMarker)) mapView.overlays.add(boatMarker)
+            boatMarker.position = p
+            boatMarker.rotation = courseDeg.value ?: 0f
+            if (follow.value) mapView.controller.animateTo(p)
+            mapView.invalidate()
+        }
+    }
+
+    DisposableEffect(Unit) { onDispose { mapView.onDetach() } }
 
     Box(Modifier.fillMaxSize()) {
         AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
         MapTopBar()
-        MapControls()
-        BottomDataBar()
+        MapControls(onLocate = {
+            follow.value = !follow.value
+            pos.value?.let {
+                mapView.controller.animateTo(it)
+                mapView.invalidate()
+            }
+        })
+        BottomDataBar(speedKts, courseDeg)
         ScaleBar()
     }
 }
@@ -279,12 +409,12 @@ private fun BoxScope.MapTopBar() {
 }
 
 @Composable
-private fun BoxScope.MapControls() {
+private fun BoxScope.MapControls(onLocate: () -> Unit) {
     Column(
         Modifier.align(Alignment.CenterStart).padding(start = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        DarkIconButton(Icons.Filled.MyLocation)
+        DarkIconButton(Icons.Filled.MyLocation, onLocate)
         DarkIconButton(Icons.Filled.Add)
         DarkIconButton(Icons.Filled.Remove)
         DarkIconButton(Icons.Filled.Layers)
@@ -292,10 +422,10 @@ private fun BoxScope.MapControls() {
 }
 
 @Composable
-private fun DarkIconButton(icon: ImageVector) {
+private fun DarkIconButton(icon: ImageVector, onClick: () -> Unit = {}) {
     Box(
         Modifier.size(42.dp).clip(RoundedCornerShape(10.dp))
-            .background(SirenPanel).clickable { },
+            .background(SirenPanel).clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
         Icon(icon, null, tint = SirenTextPrimary, modifier = Modifier.size(20.dp))
@@ -303,7 +433,10 @@ private fun DarkIconButton(icon: ImageVector) {
 }
 
 @Composable
-private fun BoxScope.BottomDataBar() {
+private fun BoxScope.BottomDataBar(
+    speedKts: MutableState<Float?>,
+    courseDeg: MutableState<Float?>
+) {
     Row(
         Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp)
             .clip(RoundedCornerShape(14.dp))
@@ -312,8 +445,8 @@ private fun BoxScope.BottomDataBar() {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(26.dp)
     ) {
-        DataCell("SOG", "5.6", "kts")
-        DataCell("COG", "142°", "T")
+        DataCell("SOG", speedKts.value?.let { "%.1f".format(it) } ?: "--", "kts")
+        DataCell("COG", courseDeg.value?.let { "%.0f°".format(it) } ?: "--", "T")
         DataCell("DERİNLİK", "42.7", "m")
         DataCell("ETA", "14:35", "")
         Icon(Icons.Filled.KeyboardArrowUp, null, tint = SirenTextPrimary)
@@ -338,19 +471,31 @@ private fun BoxScope.ScaleBar() {
     }
 }
 
+// ---------- Sağ Panel ----------
 @Composable
-fun RightPanel(modifier: Modifier = Modifier) {
+fun RightPanel(
+    modifier: Modifier = Modifier,
+    pos: MutableState<GeoPoint?>,
+    speedKts: MutableState<Float?>,
+    courseDeg: MutableState<Float?>
+) {
     Column(
         modifier.background(SirenBackground).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        TelemetryCard()
+        TelemetryCard(pos, speedKts, courseDeg)
         SonarCard()
     }
 }
 
 @Composable
-private fun TelemetryCard() {
+private fun TelemetryCard(
+    pos: MutableState<GeoPoint?>,
+    speedKts: MutableState<Float?>,
+    courseDeg: MutableState<Float?>
+) {
+    val coords = pos.value?.let { formatCoords(it.latitude, it.longitude) }
+
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
             .background(SirenCard).padding(16.dp)
@@ -361,17 +506,17 @@ private fun TelemetryCard() {
             Icon(Icons.Filled.Settings, null, tint = SirenTextSecondary, modifier = Modifier.size(16.dp))
         }
         Spacer(Modifier.height(10.dp))
-        TelemetryRow("HIZ", "5.6", "kts")
+        TelemetryRow("HIZ", speedKts.value?.let { "%.1f".format(it) } ?: "--", "kts")
         DividerLine()
-        TelemetryRow("YÖN", "142°", "T")
+        TelemetryRow("YÖN", courseDeg.value?.let { "%.0f°".format(it) } ?: "--", "T")
         DividerLine()
         TelemetryRow("DERİNLİK", "42.7", "m")
         DividerLine()
         Spacer(Modifier.height(10.dp))
         Text("KOORDİNATLAR", fontSize = 10.sp, letterSpacing = 1.sp, color = SirenTextSecondary)
         Spacer(Modifier.height(4.dp))
-        Text("36° 57.492' N", fontSize = 13.sp, color = SirenTextPrimary)
-        Text("27° 26.570' E", fontSize = 13.sp, color = SirenTextPrimary)
+        Text(coords?.first ?: "GPS bekleniyor...", fontSize = 13.sp, color = SirenTextPrimary)
+        Text(coords?.second ?: "", fontSize = 13.sp, color = SirenTextPrimary)
     }
 }
 
