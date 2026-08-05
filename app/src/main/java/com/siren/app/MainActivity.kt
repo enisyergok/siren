@@ -222,6 +222,7 @@ fun MapScreen() {
     val context = LocalContext.current
 
     val mapView = remember {
+        Configuration.getInstance().load(context, context.getSharedPreferences("osmdroid", 0))
         Configuration.getInstance().userAgentValue = "SIREN/0.2.0"
         MapView(context).apply {
             setTileSource(CartoVoyager)
