@@ -7,6 +7,7 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Bundle
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -124,7 +125,6 @@ private val OpenSeaMapSource = XYTileSource(
     "© OpenSeaMap"
 )
 
-// ---------- GPS ----------
 class GpsTracker(
     context: Context,
     private val onLocation: (Location) -> Unit
@@ -161,7 +161,6 @@ fun formatCoords(lat: Double, lon: Double): Pair<String, String> {
     return ("%02d° %06.3f' %s".format(ld, lm, latH)) to ("%03d° %06.3f' %s".format(od, om, lonH))
 }
 
-// ---------- Activity ----------
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -169,7 +168,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// ---------- Ana Yerleşim ----------
 @Composable
 fun SirenRoot() {
     val context = LocalContext.current
@@ -243,7 +241,6 @@ fun ComingSoon(title: String) {
     }
 }
 
-// ---------- Sol Menü ----------
 @Composable
 fun SideNav(selected: SirenTab, onSelect: (SirenTab) -> Unit) {
     Column(
@@ -304,7 +301,6 @@ private fun OfflineBadge() {
     }
 }
 
-// ---------- Harita ----------
 @Composable
 fun MapScreen(
     pos: MutableState<GeoPoint?>,
@@ -319,14 +315,19 @@ fun MapScreen(
         cfg.load(context, context.getSharedPreferences("osmdroid", 0))
         cfg.osmdroidBasePath = File(context.filesDir, "osmdroid")
         cfg.osmdroidTileCache = File(context.filesDir, "osmdroid/tiles")
-        cfg.userAgentValue = "SIREN/0.3.0"
+        cfg.userAgentValue = "SIREN/0.3.1"
 
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
+            setTilesScaledToDpi(true)
             zoomController.setVisibility(Visibility.NEVER)
             controller.setZoom(14.0)
             controller.setCenter(GeoPoint(36.9582, 27.4428))
+            setOnTouchListener { _, e ->
+                if (e.action == MotionEvent.ACTION_MOVE) follow.value = false
+                false
+            }
             runCatching {
                 overlays.add(
                     TilesOverlay(MapTileProviderBasic(context, OpenSeaMapSource), context).apply {
@@ -348,7 +349,10 @@ fun MapScreen(
 
     LaunchedEffect(pos.value) {
         pos.value?.let { p ->
-            if (!mapView.overlays.contains(boatMarker)) mapView.overlays.add(boatMarker)
+            if (!mapView.overlays.contains(boatMarker)) {
+                mapView.overlays.add(boatMarker)
+                mapView.controller.setZoom(15.0)
+            }
             boatMarker.position = p
             boatMarker.rotation = courseDeg.value ?: 0f
             if (follow.value) mapView.controller.animateTo(p)
@@ -361,13 +365,23 @@ fun MapScreen(
     Box(Modifier.fillMaxSize()) {
         AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
         MapTopBar()
-        MapControls(onLocate = {
-            follow.value = !follow.value
-            pos.value?.let {
-                mapView.controller.animateTo(it)
+        MapControls(
+            onLocate = {
+                follow.value = true
+                pos.value?.let {
+                    mapView.controller.animateTo(it)
+                    mapView.invalidate()
+                }
+            },
+            onZoomIn = {
+                mapView.controller.zoomIn()
+                mapView.invalidate()
+            },
+            onZoomOut = {
+                mapView.controller.zoomOut()
                 mapView.invalidate()
             }
-        })
+        )
         BottomDataBar(speedKts, courseDeg)
         ScaleBar()
     }
@@ -409,14 +423,18 @@ private fun BoxScope.MapTopBar() {
 }
 
 @Composable
-private fun BoxScope.MapControls(onLocate: () -> Unit) {
+private fun BoxScope.MapControls(
+    onLocate: () -> Unit,
+    onZoomIn: () -> Unit,
+    onZoomOut: () -> Unit
+) {
     Column(
         Modifier.align(Alignment.CenterStart).padding(start = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         DarkIconButton(Icons.Filled.MyLocation, onLocate)
-        DarkIconButton(Icons.Filled.Add)
-        DarkIconButton(Icons.Filled.Remove)
+        DarkIconButton(Icons.Filled.Add, onZoomIn)
+        DarkIconButton(Icons.Filled.Remove, onZoomOut)
         DarkIconButton(Icons.Filled.Layers)
     }
 }
@@ -471,7 +489,6 @@ private fun BoxScope.ScaleBar() {
     }
 }
 
-// ---------- Sağ Panel ----------
 @Composable
 fun RightPanel(
     modifier: Modifier = Modifier,
