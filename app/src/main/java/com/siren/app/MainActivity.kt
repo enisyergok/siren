@@ -564,6 +564,7 @@ fun MapScreen(
     }
 
     DisposableEffect(Unit) { onDispose { mapView.onDetach() } }
+    var showDownload by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize().clipToBounds()) {
         AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
@@ -576,6 +577,7 @@ fun MapScreen(
         BottomDataBar(speedKts, courseDeg)
         ScaleBar()
         RecordButton(recording, onRecordToggle)
+        if (showDownload) DownloadPanel(mapView) { showDownload = false }
     }
 }
 
@@ -616,7 +618,7 @@ private fun BoxScope.MapControls(onLocate: () -> Unit, onZoomIn: () -> Unit, onZ
         DarkIconButton(Icons.Filled.MyLocation, onLocate)
         DarkIconButton(Icons.Filled.Add, onZoomIn)
         DarkIconButton(Icons.Filled.Remove, onZoomOut)
-        DarkIconButton(Icons.Filled.Layers)
+        DarkIconButton(Icons.Filled.Layers) { showDownload = !showDownload }
     }
 }
 
