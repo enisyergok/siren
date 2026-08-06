@@ -856,6 +856,7 @@ fun MapScreen(
         ScaleBar()
         RecordButton(recording, onRecordToggle)
         CatchMarkersLayer(mapView)
+        RegionFishPanel()
         CatchButton()
         if (showLayers) LayersPanel(currentStyle = mapStyle, onSelectStyle = { mapStyle = it },
             onDownload = { showDownload = true; showLayers = false },
