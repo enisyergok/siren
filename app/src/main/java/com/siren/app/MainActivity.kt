@@ -80,9 +80,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.foundation.Image
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -274,7 +271,9 @@ fun SirenRoot() {
                             time = System.currentTimeMillis(),
                             speedKnots = (loc.speed * 1.94384).toDouble(),
                             heading = loc.bearing.toDouble()
-                        ))
+                        Box(Modifier.size(44.dp).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
+                Icon(Icons.Filled.Anchor, "SIREN", tint = Color.Black, modifier = Modifier.size(26.dp))
+            })
                     }
                 }
             }
@@ -312,7 +311,9 @@ fun SirenRoot() {
                 name = "WP " + SimpleDateFormat("HH:mm", Locale("tr")).format(Date()),
                 lat = p.latitude, lon = p.longitude,
                 createdAt = System.currentTimeMillis()
-            ))
+            Box(Modifier.size(44.dp).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
+                Icon(Icons.Filled.Anchor, "SIREN", tint = Color.Black, modifier = Modifier.size(26.dp))
+            })
         }
     }
 
@@ -608,11 +609,9 @@ fun SideNav(selected: SirenTab, onSelect: (SirenTab) -> Unit) {
     Column(Modifier.width(230.dp).fillMaxHeight().background(SirenPanel).padding(14.dp).verticalScroll(rememberScrollState())) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Image(
-                painter = painterResource(id = R.drawable.siren_logo),
-                contentDescription = "SIREN",
-                modifier = Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)),
-                contentScale = ContentScale.Crop
-            )
+            Box(Modifier.size(44.dp).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
+                Icon(Icons.Filled.Anchor, "SIREN", tint = Color.Black, modifier = Modifier.size(26.dp))
+            }
             Spacer(Modifier.width(10.dp))
             Column {
                 Text("SIREN", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = SirenTextPrimary)
@@ -858,7 +857,6 @@ fun MapScreen(
         BottomDataBar(displaySpeed, displayCourse, speedUnit)
         ScaleBar()
         RecordButton(recording, onRecordToggle)
-        RegionFishPanel()
         CatchButton()
         if (showLayers) LayersPanel(currentStyle = mapStyle, onSelectStyle = { mapStyle = it },
             onDownload = { showDownload = true; showLayers = false },
@@ -925,7 +923,9 @@ private fun BoxScope.MapTopBar(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     textStyle = TextStyle(color = SirenTextPrimary, fontSize = 13.sp)
-                )
+                Box(Modifier.size(44.dp).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
+                Icon(Icons.Filled.Anchor, "SIREN", tint = Color.Black, modifier = Modifier.size(26.dp))
+            }
             }
             if (showSearch && (searchResultsWp.isNotEmpty() || searchResultsRt.isNotEmpty())) {
                 Spacer(Modifier.height(6.dp))
