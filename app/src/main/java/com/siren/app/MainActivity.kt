@@ -319,6 +319,8 @@ fun SirenRoot() {
                     SirenTab.Izler -> TracksScreen(dao)
                     SirenTab.HavaDurumu -> WeatherScreen(pos)
                     SirenTab.Ayarlar -> SettingsScreen(settings)
+                    SirenTab.AisTrafigi -> AisScreen(pos)
+                    SirenTab.GelgitAkinti -> TideScreen(pos)
                     else -> ComingSoon(selected.title)
                 }
             }

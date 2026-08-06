@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Water
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -178,10 +179,6 @@ fun TideScreen(pos: MutableState<GeoPoint?>) {
     }
 }
 
-private fun androidx.compose.foundation.layout.Box(
-    modifier: Modifier,
-    content: @Composable () -> Unit
-) = androidx.compose.foundation.layout.Box(modifier = modifier, content = { content() })
 
 @Composable
 private fun TideStat(label: String, value: String, unit: String) {

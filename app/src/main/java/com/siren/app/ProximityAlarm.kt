@@ -9,6 +9,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.compose.runtime.MutableState
 import kotlinx.coroutines.delay
 import org.osmdroid.util.GeoPoint
 
@@ -30,7 +31,7 @@ object ProximityAlarm {
         }
     }
 
-    suspend fun monitor(ctx: Context, posState: MutableState<GeoPoint?>, waypoints: () -> List<WaypointEntity>) {
+    suspend fun monitor(ctx: Context, posState: MutableState<GeoPoint?>, waypoints: suspend () -> List<WaypointEntity>) {
         ensureChannel(ctx)
         while (true) {
             val p = posState.value
