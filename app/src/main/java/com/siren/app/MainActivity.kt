@@ -486,7 +486,7 @@ fun MapScreen(
         cfg.load(context, context.getSharedPreferences("osmdroid", 0))
         cfg.osmdroidBasePath = File(context.filesDir, "osmdroid")
         cfg.osmdroidTileCache = File(context.filesDir, "osmdroid/tiles")
-        cfg.userAgentValue = "SIREN/0.6.0"
+        cfg.userAgentValue = "SIREN/0.7.0"
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
@@ -565,7 +565,6 @@ fun MapScreen(
 
     DisposableEffect(Unit) { onDispose { mapView.onDetach() } }
     var showDownload by remember { mutableStateOf(false) }
-    var showDownload by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize().clipToBounds()) {
         AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
@@ -573,12 +572,12 @@ fun MapScreen(
         MapControls(
             onLocate = { follow.value = true; pos.value?.let { mapView.controller.animateTo(it); mapView.invalidate() } },
             onZoomIn = { mapView.controller.zoomIn(); mapView.invalidate() },
-            onZoomOut = { mapView.controller.zoomOut(); mapView.invalidate() }
+            onZoomOut = { mapView.controller.zoomOut(); mapView.invalidate() },
+            onLayers = { showDownload = !showDownload }
         )
         BottomDataBar(speedKts, courseDeg)
         ScaleBar()
         RecordButton(recording, onRecordToggle)
-        if (showDownload) DownloadPanel(mapView) { showDownload = false }
         if (showDownload) DownloadPanel(mapView) { showDownload = false }
     }
 }
@@ -615,12 +614,12 @@ private fun BoxScope.MapTopBar() {
 }
 
 @Composable
-private fun BoxScope.MapControls(onLocate: () -> Unit, onZoomIn: () -> Unit, onZoomOut: () -> Unit) {
+private fun BoxScope.MapControls(onLocate: () -> Unit, onZoomIn: () -> Unit, onZoomOut: () -> Unit, onLayers: () -> Unit) {
     Column(Modifier.align(Alignment.CenterStart).padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         DarkIconButton(Icons.Filled.MyLocation, onLocate)
         DarkIconButton(Icons.Filled.Add, onZoomIn)
         DarkIconButton(Icons.Filled.Remove, onZoomOut)
-        DarkIconButton(Icons.Filled.Layers) { showDownload = !showDownload }
+        DarkIconButton(Icons.Filled.Layers, onLayers)
     }
 }
 
