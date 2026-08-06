@@ -1,7 +1,9 @@
 package com.siren.app
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,11 +22,12 @@ import androidx.compose.material.icons.filled.Water
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import org.osmdroid.util.GeoPoint
@@ -61,7 +65,7 @@ private suspend fun fetchTide(lat: Double, lon: Double): TideSnapshot? = withCon
         val con = url.openConnection() as HttpURLConnection
         con.connectTimeout = 8000
         con.readTimeout = 8000
-        con.setRequestProperty("User-Agent", "SIREN/0.11.0")
+        con.setRequestProperty("User-Agent", "SIREN/0.11.1")
         val body = con.inputStream.bufferedReader().use { it.readText() }
         con.disconnect()
         val j = JSONObject(body)
@@ -106,7 +110,7 @@ fun TideScreen(pos: MutableState<GeoPoint?>) {
     var data by remember { mutableStateOf<TideSnapshot?>(null) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var fetchedAt by remember { mutableStateOf(0L) }
+    val scope = rememberCoroutineScope()
 
     val refresh: () -> Unit = {
         val p = pos.value
@@ -115,11 +119,10 @@ fun TideScreen(pos: MutableState<GeoPoint?>) {
         } else {
             loading = true
             error = null
-            kotlinx.coroutines.GlobalScope.launch {
+            scope.launch {
                 val d = fetchTide(p.latitude, p.longitude)
                 loading = false
                 data = d
-                fetchedAt = System.currentTimeMillis()
                 if (d == null) error = "Marine verisi alinamadi"
             }
         }
@@ -137,7 +140,7 @@ fun TideScreen(pos: MutableState<GeoPoint?>) {
                 Text("GELGIT & AKINTI", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = SirenTextPrimary)
                 Text("Open-Meteo Marine API", color = SirenTextSecondary, fontSize = 11.sp)
             }
-            androidx.compose.foundation.layout.Box(
+            Box(
                 Modifier.clip(RoundedCornerShape(10.dp)).background(SirenPrimary)
                     .clickable { refresh() }
                     .padding(horizontal = 14.dp, vertical = 9.dp)
@@ -178,7 +181,6 @@ fun TideScreen(pos: MutableState<GeoPoint?>) {
         }
     }
 }
-
 
 @Composable
 private fun TideStat(label: String, value: String, unit: String) {
