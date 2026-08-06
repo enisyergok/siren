@@ -324,7 +324,7 @@ fun SirenRoot() {
                     else -> ComingSoon(selected.title)
                 }
             }
-            RightPanel(Modifier.width(260.dp).fillMaxHeight(), pos, speedKts, courseDeg)
+            if (!settings.fullscreen) RightPanel(Modifier.width(260.dp).fillMaxHeight(), pos, speedKts, courseDeg)
         }
         SideNav(selected = selected, onSelect = { selected = it })
     }
@@ -388,6 +388,34 @@ fun SettingsScreen(settings: SirenSettings) {
             }
             .padding(14.dp), contentAlignment = Alignment.Center) {
             Text("TUM VERILERI DISA AKTAR (JSON)", color = Color.White, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(24.dp))
+        Text("GORUNUM", color = SirenTextSecondary, fontSize = 12.sp, letterSpacing = 1.sp)
+        Spacer(Modifier.height(8.dp))
+        var fs by remember { mutableStateOf(settings.fullscreen) }
+        Row(Modifier.fillMaxWidth().padding(vertical = 5.dp).clip(RoundedCornerShape(10.dp))
+            .background(SirenCard)
+            .clickable { fs = !fs; settings.fullscreen = fs }
+            .padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Tam Ekran Harita (sag paneli gizle)", color = SirenTextPrimary, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.weight(1f))
+            if (fs) Icon(Icons.Filled.CheckCircle, null, tint = SirenGreen, modifier = Modifier.size(20.dp))
+        }
+        Spacer(Modifier.height(24.dp))
+        Text("IZ RENGİ", color = SirenTextSecondary, fontSize = 12.sp, letterSpacing = 1.sp)
+        Spacer(Modifier.height(8.dp))
+        var tc by remember { mutableStateOf(settings.trackColor) }
+        TrackColor.values().forEach { c ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 5.dp).clip(RoundedCornerShape(10.dp))
+                .background(if (tc == c) SirenPrimary else SirenCard)
+                .clickable { tc = c; settings.trackColor = c }
+                .padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(20.dp).clip(CircleShape).background(Color(android.graphics.Color.parseColor(c.hex))))
+                Spacer(Modifier.width(10.dp))
+                Text(c.label, color = Color.White, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.weight(1f))
+                if (tc == c) Icon(Icons.Filled.CheckCircle, null, tint = SirenGreen, modifier = Modifier.size(20.dp))
+            }
         }
         Spacer(Modifier.height(24.dp))
         Text("SIREN v0.11.0", color = SirenTextSecondary, fontSize = 11.sp)
@@ -705,7 +733,7 @@ fun MapScreen(
     }
 
     val trackLine = remember { Polyline(mapView).apply {
-        outlinePaint.color = android.graphics.Color.parseColor("#F2C94C")
+        outlinePaint.color = android.graphics.Color.parseColor(settings.trackColor.hex)
         outlinePaint.strokeWidth = 8f
     }}
     val routePlanLine = remember { Polyline(mapView).apply {
@@ -715,7 +743,10 @@ fun MapScreen(
     val savedRouteLines = remember { mutableListOf<Polyline>() }
 
     LaunchedEffect(Unit) { mapView.overlays.add(trackLine); mapView.overlays.add(routePlanLine); mapView.invalidate() }
-    LaunchedEffect(trackPoints.value) { trackLine.setPoints(trackPoints.value); mapView.invalidate() }
+    LaunchedEffect(trackPoints.value, settings.trackColor) {
+        trackLine.outlinePaint.color = android.graphics.Color.parseColor(settings.trackColor.hex)
+        trackLine.setPoints(trackPoints.value); mapView.invalidate()
+    }
     LaunchedEffect(routePlanner.value) { routePlanLine.setPoints(routePlanner.value); mapView.invalidate() }
 
     val boatMarker = remember {
