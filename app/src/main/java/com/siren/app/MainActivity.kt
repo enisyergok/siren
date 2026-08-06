@@ -142,9 +142,9 @@ enum class SirenTab(val title: String, val icon: ImageVector) {
     GelgitAkinti("Gelgit ve Akinti", Icons.Filled.Water),
     Sonar("Sonar", Icons.Filled.Radar),
     Balog("Balik Gunlugu", Icons.Filled.DirectionsBoat),
-    AdvancedFishing("Ileri Balikci", Icons.Filled.Science),
+    AdvancedFishing("Ileri Balikci", Icons.Filled.Star),
     Balog("Balik Gunlugu", Icons.Filled.DirectionsBoat),
-    AdvancedFishing("Ileri Balikci", Icons.Filled.Science),
+    Balog("Balik Gunlugu", Icons.Filled.DirectionsBoat),
     Ayarlar("Ayarlar", Icons.Filled.Settings)
 }
 
@@ -329,7 +329,6 @@ fun SirenRoot() {
                     SirenTab.Ayarlar -> SettingsScreen(settings)
                     SirenTab.AisTrafigi -> AisScreen(pos)
                     SirenTab.GelgitAkinti -> TideScreen(pos)
-                    SirenTab.Sonar -> SonarScreen()
                     SirenTab.Balog -> CatchLogScreen(db.catchDao(), pos)
                     SirenTab.AdvancedFishing -> AdvancedFishingScreen(pos, db.catchDao())
                     else -> ComingSoon(selected.title)
@@ -1154,30 +1153,5 @@ private fun SonarCard() {
             contentAlignment = Alignment.Center) {
             Icon(Icons.Filled.Pause, null, tint = Color.White)
         }
-    }
-}
-
-@Composable
-fun AdvancedFishingScreen(pos: MutableState<GeoPoint?>, dao: CatchDao) {
-    val catches by dao.observeAll().collectAsState(initial = emptyList())
-    
-    Column(
-        Modifier.fillMaxSize()
-            .background(Color(0xFF0A1929))
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp)
-    ) {
-        Text("🎣 İLERİ DÜZEY BALIKÇI",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-        
-        AdvancedSolunar.SevenDayForecast(pos)
-        FishDatabase.FishEncyclopedia()
-        BaitAdvisor.BaitRecommendationCard(pos)
-        SpotScorer.SpotScoreCard(pos)
-        FishingStatsDashboard(catches)
     }
 }
