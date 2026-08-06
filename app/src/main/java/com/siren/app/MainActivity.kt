@@ -14,6 +14,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -81,6 +82,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -607,8 +609,8 @@ private fun shareGpx(context: Context, gpxContent: String, filename: String) {
 fun SideNav(selected: SirenTab, onSelect: (SirenTab) -> Unit) {
     Column(Modifier.width(230.dp).fillMaxHeight().background(SirenPanel).padding(14.dp).verticalScroll(rememberScrollState())) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(44.dp).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.Anchor, "SIREN", tint = Color.Black, modifier = Modifier.size(26.dp))
+            Box(Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)).background(SirenPanel), contentAlignment = Alignment.Center) {
+                Image(painterResource(id = R.drawable.siren_logo), contentDescription = "SIREN", modifier = Modifier.size(44.dp))
             }
             Spacer(Modifier.width(10.dp))
             Column {
