@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -65,7 +66,7 @@ private suspend fun fetchTide(lat: Double, lon: Double): TideSnapshot? = withCon
         val con = url.openConnection() as HttpURLConnection
         con.connectTimeout = 8000
         con.readTimeout = 8000
-        con.setRequestProperty("User-Agent", "SIREN/0.11.1")
+        con.setRequestProperty("User-Agent", "SIREN/0.11.2")
         val body = con.inputStream.bufferedReader().use { it.readText() }
         con.disconnect()
         val j = JSONObject(body)
@@ -183,7 +184,7 @@ fun TideScreen(pos: MutableState<GeoPoint?>) {
 }
 
 @Composable
-private fun TideStat(label: String, value: String, unit: String) {
+private fun RowScope.TideStat(label: String, value: String, unit: String) {
     Column(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(SirenCard).padding(14.dp)) {
         Text(label, fontSize = 9.sp, letterSpacing = 1.sp, color = SirenTextSecondary)
         Row(verticalAlignment = Alignment.Bottom) {
