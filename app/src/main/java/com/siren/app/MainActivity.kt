@@ -861,6 +861,7 @@ fun MapScreen(
         BottomDataBar(displaySpeed, displayCourse, speedUnit)
         ScaleBar()
         RecordButton(recording, onRecordToggle)
+        RegionFishPanel()
         CatchButton()
         if (showLayers) LayersPanel(currentStyle = mapStyle, onSelectStyle = { mapStyle = it },
             onDownload = { showDownload = true; showLayers = false },
