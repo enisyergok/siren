@@ -93,6 +93,8 @@ import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.tileprovider.MapTileProviderBasic
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.tileprovider.tilesource.XYTileSource
+import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
+import org.osmdroid.util.MapTileIndex
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.CustomZoomButtonsController.Visibility as OsmVisibility
 import org.osmdroid.views.MapView
@@ -144,17 +146,21 @@ enum class SirenTab(val title: String, val icon: ImageVector) {
 
 val CartoVoyager = XYTileSource(
     "CartoVoyager", 1, 20, 256, ".png",
-    arrayOf("https://a.basemaps.cartocdn.com/rastertiles/voyager",
-        "https://b.basemaps.cartocdn.com/rastertiles/voyager",
-        "https://c.basemaps.cartocdn.com/rastertiles/voyager"),
+    arrayOf("https://a.basemaps.cartocdn.com/rastertiles/voyager/",
+        "https://b.basemaps.cartocdn.com/rastertiles/voyager/",
+        "https://c.basemaps.cartocdn.com/rastertiles/voyager/"),
     "© OSM © CARTO"
 )
 
-val EsriImagery = XYTileSource(
-    "EsriImagery", 1, 19, 256, ".jpg",
-    arrayOf("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile"),
-    "© Esri"
-)
+val EsriImagery = object : OnlineTileSourceBase("EsriImagery", 1, 19, 256, ".jpg",
+    arrayOf("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/")) {
+    override fun getTileURLString(pMapTileIndex: Long): String {
+        return "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/" +
+            MapTileIndex.getZoom(pMapTileIndex) + "/" +
+            MapTileIndex.getY(pMapTileIndex) + "/" +
+            MapTileIndex.getX(pMapTileIndex) + ".jpg"
+    }
+}
 
 private val OpenSeaMapSource = XYTileSource(
     "OpenSeaMap", 1, 19, 256, ".png",
