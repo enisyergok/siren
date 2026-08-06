@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -33,8 +34,6 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Overlay
 import org.osmdroid.views.overlay.Polyline
-import kotlin.math.cos
-import kotlin.math.sin
 
 class SwingCircleOverlay : Overlay() {
     override fun draw(c: Canvas, mv: MapView, shadow: Boolean) {
@@ -82,7 +81,6 @@ fun BoxScope.ToolsColumn(mapView: MapView) {
         ToolBtn(if (night) "🌙" else "☀️") { SirenNav.nightMode.value = !night }
     }
 
-    // 7) EBL/VRM olcer (harita merkezi yakalama - cakisma yok)
     if (showMeasure) {
         val a by SirenNav.measureA
         val b by SirenNav.measureB
@@ -109,13 +107,22 @@ fun BoxScope.ToolsColumn(mapView: MapView) {
                         if (lineAdded) { mapView.overlays.remove(line); lineAdded = false }
                     })
             }
-            if (a != null if (a != null && b != null) {if (a != null && b != null) { b != null) {
+            if (a != null && b != null) {
+                val d = haversineNm(a!!.latitude, a!!.longitude, b!!.latitude, b!!.longitude)
+                val brg = NavMath.bearingDeg(a!!, b!!)
+                Text("%.2f nm · %.0f°".format(d, brg), color = Color.White,
+                    fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
+                LaunchedEffect(a, b) {
+                    line.setPoints(listOf(a!!, b!!))
+                    line.outlinePaint.color = android.graphics.Color.CYAN
+                    line.outlinePaint.strokeWidth = 5f
+                    if (!lineAdded) { mapView.overlays.add(line); lineAdded = true }
+                    mapView.invalidate()
                 }
             }
         }
     }
 
-    // 8) Demir: salinim dairesi + zincir hesaplayici
     if (showAnchor) {
         var depth by remember { mutableStateOf("") }
         AlertDialog(
@@ -154,7 +161,6 @@ fun BoxScope.ToolsColumn(mapView: MapView) {
         )
     }
 
-    // Salinim dairesi overlay
     LaunchedEffect(Unit) {
         mapView.overlays.add(1, SwingCircleOverlay())
         mapView.invalidate()
@@ -169,7 +175,6 @@ private fun ToolBtn(icon: String, onClick: () -> Unit) {
     }
 }
 
-// 10) Kirmizi gece modu (dokunmalari engellemez)
 @Composable
 fun BoxScope.NightFilter() {
     val night by SirenNav.nightMode
