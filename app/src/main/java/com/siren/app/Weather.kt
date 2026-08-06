@@ -183,6 +183,7 @@ fun WeatherScreen(pos: MutableState<GeoPoint?>) {
                 BigStat("SICAKLIK", w.temperatureC?.let { "%.0f".format(it) } ?: "--", "C")
             }
             Spacer(Modifier.height(20.dp))
+            SunCard(pos)
             Text("SONRAKI 8 SAAT", color = SirenTextSecondary, fontSize = 12.sp, letterSpacing = 1.sp)
             Spacer(Modifier.height(8.dp))
             w.hourly.forEach { h ->

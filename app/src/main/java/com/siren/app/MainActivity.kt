@@ -235,6 +235,7 @@ fun SirenRoot() {
     val dao = db.trackDao()
     val wpDao = db.waypointDao()
     val routeDao = db.routeDao()
+    SirenNav.routeDao = routeDao
     val scope = rememberCoroutineScope()
     val recording = remember { mutableStateOf(false) }
     val currentTrackId = remember { mutableStateOf<String?>(null) }
@@ -255,6 +256,8 @@ fun SirenRoot() {
             pos.value = GeoPoint(loc.latitude, loc.longitude)
             speedKts.value = loc.speed * 1.94384f
             courseDeg.value = loc.bearing
+            SirenNav.onLocation(GeoPoint(loc.latitude, loc.longitude), loc.speed * 1.94384f)
+            SirenNav.accuracy.value = loc.accuracy
             if (recording.value) {
                 val tid = currentTrackId.value
                 if (tid != null) {
@@ -535,6 +538,7 @@ fun TracksScreen(dao: TrackDao) {
         stats = map
     }
     Column(Modifier.fillMaxSize().background(SirenBackground).padding(24.dp).verticalScroll(rememberScrollState())) {
+        TripComputerCard()
         Text("IZLER", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = SirenTextPrimary)
         Spacer(Modifier.height(16.dp))
         if (tracks.isEmpty()) Text("Henuz kayitli iz yok.", color = SirenTextSecondary)
@@ -848,6 +852,7 @@ fun MapScreen(
             onClose = { showLayers = false })
         if (showDownload) DownloadPanel(mapView) { showDownload = false }
         if (planningMode) RoutePlanOverlay(routePlanner.value)
+        NavBadgeColumn()
     }
 }
 
@@ -921,7 +926,7 @@ private fun BoxScope.MapTopBar(
                         }
                     }
                     searchResultsRt.forEach { r ->
-                        Row(Modifier.fillMaxWidth().clickable { onSearchChange("") }.padding(8.dp),
+                        Row(Modifier.fillMaxWidth().clickable { SirenNav.followRoute(r); onSearchChange("") }.padding(8.dp),
                             verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Filled.AltRoute, null, tint = SirenRouteBlue, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(8.dp))
