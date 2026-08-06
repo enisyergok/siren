@@ -58,6 +58,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.Water
+import androidx.compose.material.icons.filled.Gesture
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -143,6 +144,7 @@ enum class SirenTab(val title: String, val icon: ImageVector) {
     Sonar("Sonar", Icons.Filled.Radar),
     Balog("Balik Gunlugu", Icons.Filled.DirectionsBoat),
     AdvancedFishing("Ileri Balikci", Icons.Filled.Timeline),
+    OltaBaglari("Olta Baglari", Icons.Filled.Gesture),
     Ayarlar("Ayarlar", Icons.Filled.Settings)
 }
 
@@ -329,6 +331,7 @@ fun SirenRoot() {
                     SirenTab.GelgitAkinti -> TideScreen(pos)
                     SirenTab.Balog -> CatchLogScreen(db.catchDao(), pos)
                     SirenTab.AdvancedFishing -> AdvancedFishingScreen(pos, db.catchDao())
+                    SirenTab.OltaBaglari -> KnotGuideScreen()
                     else -> ComingSoon(selected.title)
                 }
             }
