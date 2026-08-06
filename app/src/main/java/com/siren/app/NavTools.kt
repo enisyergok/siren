@@ -109,17 +109,7 @@ fun BoxScope.ToolsColumn(mapView: MapView) {
                         if (lineAdded) { mapView.overlays.remove(line); lineAdded = false }
                     })
             }
-            if (a != null && b != null) {
-                val d = haversineNm(a!!.latitude, a!!.longitude, b!!.latitude, b!!.longitude)
-                val brg = NavMath.bearingDeg(a!!, b!!)
-                Text("%.2f nm · %.0f°".format(d, brg), color = Color.White,
-                    fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
-                LaunchedEffect(a, b) {
-                    line.points = listOf(a!!, b!!)
-                    line.outlinePaint.color = android.graphics.Color.CYAN
-                    line.outlinePaint.strokeWidth = 5f
-                    if (!lineAdded) { mapView.overlays.add(line); lineAdded = true }
-                    mapView.invalidate()
+            if (a != null if (a != null && b != null) {if (a != null && b != null) { b != null) {
                 }
             }
         }

@@ -13,6 +13,7 @@ import org.json.JSONObject
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Overlay
+import androidx.compose.foundation.layout.BoxScope
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.math.cos

@@ -5,6 +5,8 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import kotlin.math.cos
+import kotlin.math.sin
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -42,7 +44,7 @@ fun HeadingSensor() {
             override fun onSensorChanged(e: SensorEvent?) {
                 if (e == null) return
                 if (e.sensor.type == Sensor.TYPE_ROTATION_VECTOR) {
-                    SensorManager.getRotationMatrixFromRotationVector(m, e.values)
+                    SensorManager.getRotationMatrixFromVector(m, e.values)
                     SensorManager.getOrientation(m, o)
                     val az = (Math.toDegrees(o[0].toDouble()) + 360.0) % 360.0
                     SirenNav.heading.value = az.toFloat()
