@@ -312,6 +312,7 @@ fun SirenRoot() {
                     SirenTab.Rotalar -> RoutesScreen(routeDao)
                     SirenTab.Waypointler -> WaypointsScreen(wpDao)
                     SirenTab.Izler -> TracksScreen(dao)
+                    SirenTab.HavaDurumu -> WeatherScreen(pos)
                     else -> ComingSoon(selected.title)
                 }
             }
@@ -583,10 +584,6 @@ fun MapScreen(
             controller.setCenter(GeoPoint(36.9582, 27.4428))
             setOnTouchListener { _, e ->
                 if (e.action == MotionEvent.ACTION_MOVE) follow.value = false
-                if (planningMode && e.action == MotionEvent.ACTION_UP) {
-                    val p = projection.fromPixels(e.x.toInt(), e.y.toInt()) as GeoPoint
-                    routePlanner.value = routePlanner.value + p
-                }
                 false
             }
             runCatching {
