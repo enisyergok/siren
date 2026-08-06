@@ -56,6 +56,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Water
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -91,8 +92,9 @@ import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.tileprovider.MapTileProviderBasic
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.tileprovider.tilesource.XYTileSource
+import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.CustomZoomButtonsController.Visibility
+import org.osmdroid.views.CustomZoomButtonsController.Visibility as OsmVisibility
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
@@ -122,16 +124,10 @@ val SirenDivider = Color(0xFF1D2A40)
 
 @Composable
 fun SirenTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = darkColorScheme(
-            primary = SirenPrimary,
-            background = SirenBackground,
-            surface = SirenPanel,
-            onBackground = SirenTextPrimary,
-            onSurface = SirenTextPrimary
-        ),
-        content = content
-    )
+    MaterialTheme(colorScheme = darkColorScheme(
+        primary = SirenPrimary, background = SirenBackground, surface = SirenPanel,
+        onBackground = SirenTextPrimary, onSurface = SirenTextPrimary
+    ), content = content)
 }
 
 enum class SirenTab(val title: String, val icon: ImageVector) {
@@ -146,18 +142,34 @@ enum class SirenTab(val title: String, val icon: ImageVector) {
     Ayarlar("Ayarlar", Icons.Filled.Settings)
 }
 
+val CartoVoyager = XYTileSource(
+    "CartoVoyager", 1, 20, 256, ".png",
+    arrayOf("https://a.basemaps.cartocdn.com/rastertiles/voyager",
+        "https://b.basemaps.cartocdn.com/rastertiles/voyager",
+        "https://c.basemaps.cartocdn.com/rastertiles/voyager"),
+    "© OpenStreetMap contributors © CARTO"
+)
+
+val EsriImagery = XYTileSource(
+    "EsriImagery", 1, 19, 256, ".jpg",
+    arrayOf("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile"),
+    "© Esri"
+)
+
 private val OpenSeaMapSource = XYTileSource(
     "OpenSeaMap", 1, 19, 256, ".png",
     arrayOf("https://tiles.openseamap.org/seamark"),
     "OpenSeaMap"
 )
 
-class GpsTracker(
-    context: Context,
-    private val onLocation: (Location) -> Unit
-) : LocationListener {
-    private val manager =
-        context.applicationContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+fun tileSourceFor(style: MapStyle) = when (style) {
+    MapStyle.OSM -> TileSourceFactory.MAPNIK
+    MapStyle.CARTO -> CartoVoyager
+    MapStyle.SATELLITE -> EsriImagery
+}
+
+class GpsTracker(context: Context, private val onLocation: (Location) -> Unit) : LocationListener {
+    private val manager = context.applicationContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager
     fun start() {
         runCatching {
             manager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, this)
@@ -169,8 +181,7 @@ class GpsTracker(
 }
 
 fun formatCoords(lat: Double, lon: Double): Pair<String, String> {
-    val la = Math.abs(lat)
-    val lo = Math.abs(lon)
+    val la = Math.abs(lat); val lo = Math.abs(lon)
     val ld = la.toInt(); val lm = (la - ld) * 60
     val od = lo.toInt(); val om = (lo - od) * 60
     val latH = if (lat >= 0) "N" else "S"
@@ -183,8 +194,8 @@ fun haversineNm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double 
     val dLat = Math.toRadians(lat2 - lat1)
     val dLon = Math.toRadians(lon2 - lon1)
     val a = sin(dLat / 2) * sin(dLat / 2) +
-            cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
-            sin(dLon / 2) * sin(dLon / 2)
+        cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
+        sin(dLon / 2) * sin(dLon / 2)
     return R * 2 * atan2(sqrt(a), sqrt(1 - a))
 }
 
@@ -208,6 +219,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun SirenRoot() {
     val context = LocalContext.current
+    val settings = remember { SirenSettings(context) }
     var selected by remember { mutableStateOf(SirenTab.Harita) }
     val pos = remember { mutableStateOf<GeoPoint?>(null) }
     val speedKts = remember { mutableStateOf<Float?>(null) }
@@ -225,10 +237,8 @@ fun SirenRoot() {
     val routes by routeDao.observeAll().collectAsState(initial = emptyList())
 
     var hasLocPerm by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED
-        )
+        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+            == PackageManager.PERMISSION_GRANTED)
     }
     val permLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -244,28 +254,20 @@ fun SirenRoot() {
                 if (tid != null) {
                     trackPoints.value = trackPoints.value + GeoPoint(loc.latitude, loc.longitude)
                     scope.launch {
-                        dao.insertPoint(
-                            TrackPointEntity(
-                                trackId = tid,
-                                lat = loc.latitude,
-                                lon = loc.longitude,
-                                time = System.currentTimeMillis(),
-                                speedKnots = (loc.speed * 1.94384).toDouble(),
-                                heading = loc.bearing.toDouble()
-                            )
-                        )
+                        dao.insertPoint(TrackPointEntity(
+                            trackId = tid, lat = loc.latitude, lon = loc.longitude,
+                            time = System.currentTimeMillis(),
+                            speedKnots = (loc.speed * 1.94384).toDouble(),
+                            heading = loc.bearing.toDouble()
+                        ))
                     }
                 }
             }
         }
     }
     LaunchedEffect(Unit) {
-        if (!hasLocPerm) {
-            permLauncher.launch(arrayOf(
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ))
-        }
+        if (!hasLocPerm) permLauncher.launch(arrayOf(
+            Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
     }
     LaunchedEffect(hasLocPerm) { if (hasLocPerm) tracker.start() else tracker.stop() }
     DisposableEffect(Unit) { onDispose { tracker.stop() } }
@@ -279,23 +281,19 @@ fun SirenRoot() {
             recording.value = true
             scope.launch { dao.insertTrack(TrackEntity(id, name, System.currentTimeMillis(), null, true)) }
         } else {
-            currentTrackId.value?.let { id ->
-                scope.launch { dao.finishTrack(id, System.currentTimeMillis()) }
-            }
+            currentTrackId.value?.let { id -> scope.launch { dao.finishTrack(id, System.currentTimeMillis()) } }
             recording.value = false
         }
     }
 
     val onAddWaypoint: (GeoPoint) -> Unit = { p ->
         scope.launch {
-            wpDao.insert(
-                WaypointEntity(
-                    id = UUID.randomUUID().toString(),
-                    name = "WP " + SimpleDateFormat("HH:mm", Locale("tr")).format(Date()),
-                    lat = p.latitude, lon = p.longitude,
-                    createdAt = System.currentTimeMillis()
-                )
-            )
+            wpDao.insert(WaypointEntity(
+                id = UUID.randomUUID().toString(),
+                name = "WP " + SimpleDateFormat("HH:mm", Locale("tr")).format(Date()),
+                lat = p.latitude, lon = p.longitude,
+                createdAt = System.currentTimeMillis()
+            ))
         }
     }
 
@@ -304,15 +302,13 @@ fun SirenRoot() {
             Spacer(Modifier.width(230.dp))
             Box(Modifier.weight(1f).clipToBounds()) {
                 when (selected) {
-                    SirenTab.Harita -> MapScreen(
-                        pos, speedKts, courseDeg, follow,
-                        trackPoints, recording, onRecordToggle,
-                        waypoints, onAddWaypoint, routes, routeDao
-                    )
+                    SirenTab.Harita -> MapScreen(pos, speedKts, courseDeg, follow, trackPoints,
+                        recording, onRecordToggle, waypoints, onAddWaypoint, routes, routeDao, settings)
                     SirenTab.Rotalar -> RoutesScreen(routeDao)
                     SirenTab.Waypointler -> WaypointsScreen(wpDao)
                     SirenTab.Izler -> TracksScreen(dao)
                     SirenTab.HavaDurumu -> WeatherScreen(pos)
+                    SirenTab.Ayarlar -> SettingsScreen(settings)
                     else -> ComingSoon(selected.title)
                 }
             }
@@ -334,6 +330,55 @@ fun ComingSoon(title: String) {
 }
 
 @Composable
+fun SettingsScreen(settings: SirenSettings) {
+    var style by remember { mutableStateOf(settings.mapStyle) }
+    var unit by remember { mutableStateOf(settings.speedUnit) }
+
+    Column(Modifier.fillMaxSize().background(SirenBackground).padding(24.dp).verticalScroll(rememberScrollState())) {
+        Text("AYARLAR", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = SirenTextPrimary)
+        Spacer(Modifier.height(20.dp))
+
+        Text("HARITA KAYNAGI", color = SirenTextSecondary, fontSize = 12.sp, letterSpacing = 1.sp)
+        Spacer(Modifier.height(8.dp))
+        MapStyle.values().forEach { s ->
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 5.dp).clip(RoundedCornerShape(10.dp))
+                    .background(if (style == s) SirenPrimary else SirenCard)
+                    .clickable { style = s; settings.mapStyle = s }
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(s.label, color = Color.White, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.weight(1f))
+                if (style == s) Icon(Icons.Filled.CheckCircle, null, tint = SirenGreen, modifier = Modifier.size(20.dp))
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        Text("HIZ BIRIMI", color = SirenTextSecondary, fontSize = 12.sp, letterSpacing = 1.sp)
+        Spacer(Modifier.height(8.dp))
+        SpeedUnit.values().forEach { u ->
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 5.dp).clip(RoundedCornerShape(10.dp))
+                    .background(if (unit == u) SirenPrimary else SirenCard)
+                    .clickable { unit = u; settings.speedUnit = u }
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("${u.label} (${u.key})", color = Color.White, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.weight(1f))
+                if (unit == u) Icon(Icons.Filled.CheckCircle, null, tint = SirenGreen, modifier = Modifier.size(20.dp))
+            }
+        }
+
+        Spacer(Modifier.height(30.dp))
+        Text("SIREN v0.10.0", color = SirenTextSecondary, fontSize = 11.sp)
+        Text("Acik kaynak, cevrimdisi deniz navigasyonu.", color = SirenTextSecondary, fontSize = 11.sp)
+    }
+}
+
+@Composable
 fun WaypointsScreen(dao: WaypointDao) {
     val context = LocalContext.current
     val wps by dao.observeAll().collectAsState(initial = emptyList())
@@ -346,15 +391,9 @@ fun WaypointsScreen(dao: WaypointDao) {
                 Text("Haritada UZUN BAS = yeni waypoint.", color = SirenTextSecondary, fontSize = 12.sp)
             }
             if (wps.isNotEmpty()) {
-                Box(
-                    Modifier.clip(RoundedCornerShape(10.dp)).background(SirenPrimary)
-                        .clickable {
-                            scope.launch {
-                                shareGpx(context, waypointsToGpx(dao.getAllOnce()), "siren-waypoints.gpx")
-                            }
-                        }
-                        .padding(horizontal = 16.dp, vertical = 10.dp)
-                ) {
+                Box(Modifier.clip(RoundedCornerShape(10.dp)).background(SirenPrimary)
+                    .clickable { scope.launch { shareGpx(context, waypointsToGpx(dao.getAllOnce()), "siren-waypoints.gpx") } }
+                    .padding(horizontal = 16.dp, vertical = 10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.Share, null, tint = Color.White, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
@@ -366,11 +405,8 @@ fun WaypointsScreen(dao: WaypointDao) {
         Spacer(Modifier.height(16.dp))
         if (wps.isEmpty()) Text("Henuz waypoint yok.", color = SirenTextSecondary)
         wps.forEach { wp ->
-            Row(
-                Modifier.fillMaxWidth().padding(vertical = 6.dp).clip(RoundedCornerShape(12.dp))
-                    .background(SirenCard).padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp).clip(RoundedCornerShape(12.dp))
+                .background(SirenCard).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.Place, null, tint = SirenTrackYellow)
                 Spacer(Modifier.width(12.dp))
                 Column {
@@ -378,10 +414,8 @@ fun WaypointsScreen(dao: WaypointDao) {
                     Text("%.5f, %.5f".format(wp.lat, wp.lon), color = SirenTextSecondary, fontSize = 12.sp)
                 }
                 Spacer(Modifier.weight(1f))
-                Icon(
-                    Icons.Filled.Delete, null, tint = SirenRed,
-                    modifier = Modifier.size(20.dp).clickable { scope.launch { dao.delete(wp.id) } }
-                )
+                Icon(Icons.Filled.Delete, null, tint = SirenRed,
+                    modifier = Modifier.size(20.dp).clickable { scope.launch { dao.delete(wp.id) } })
             }
         }
     }
@@ -392,44 +426,54 @@ fun RoutesScreen(dao: RouteDao) {
     val context = LocalContext.current
     val routes by dao.observeAll().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
+    var stats by remember { mutableStateOf<Map<String, Pair<Int, Double>>>(emptyMap()) }
+
+    LaunchedEffect(routes) {
+        val map = mutableMapOf<String, Pair<Int, Double>>()
+        routes.forEach { r ->
+            val pts = dao.getPointsForRoute(r.id).map { GeoPoint(it.lat, it.lon) }
+            map[r.id] = (pts.size) to routeTotalNm(pts)
+        }
+        stats = map
+    }
+
     Column(Modifier.fillMaxSize().background(SirenBackground).padding(24.dp).verticalScroll(rememberScrollState())) {
         Text("ROTALAR", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = SirenTextPrimary)
         Spacer(Modifier.height(6.dp))
-        Text("Harita ekraninda 'Rota Planla' butonu ile yeni rota olustur.", color = SirenTextSecondary, fontSize = 12.sp)
+        Text("Haritada 'Rota Planla' butonu ile yeni rota olustur.", color = SirenTextSecondary, fontSize = 12.sp)
         Spacer(Modifier.height(16.dp))
         if (routes.isEmpty()) Text("Henuz rota yok.", color = SirenTextSecondary)
         routes.forEach { r ->
-            Row(
-                Modifier.fillMaxWidth().padding(vertical = 6.dp).clip(RoundedCornerShape(12.dp))
-                    .background(SirenCard).padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            val st = stats[r.id]
+            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp).clip(RoundedCornerShape(12.dp))
+                .background(SirenCard).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.AltRoute, null, tint = SirenRouteBlue)
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text(r.name, color = SirenTextPrimary, fontWeight = FontWeight.SemiBold)
                     Text(SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr")).format(Date(r.createdAt)),
                         color = SirenTextSecondary, fontSize = 12.sp)
+                    if (st != null) {
+                        Row {
+                            Text("${st.first} nokta", color = SirenTextSecondary, fontSize = 11.sp)
+                            Spacer(Modifier.width(10.dp))
+                            Text("%.1f nm".format(st.second), color = SirenRouteBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.width(10.dp))
+                            Text("~%.0f dk".format(st.second / 5.0 * 60), color = SirenTextSecondary, fontSize = 11.sp)
+                        }
+                    }
                 }
                 Spacer(Modifier.weight(1f))
-                Icon(
-                    Icons.Filled.Share, null, tint = SirenPrimary,
+                Icon(Icons.Filled.Share, null, tint = SirenPrimary,
                     modifier = Modifier.size(20.dp).clickable {
                         scope.launch {
                             val pts = dao.getPointsForRoute(r.id)
-                            if (pts.isNotEmpty()) {
-                                shareGpx(context, routeToGpx(r, pts), "siren-route.gpx")
-                            }
+                            if (pts.isNotEmpty()) shareGpx(context, routeToGpx(r, pts), "siren-route.gpx")
                         }
-                    }
-                )
+                    })
                 Spacer(Modifier.width(12.dp))
-                Icon(
-                    Icons.Filled.Delete, null, tint = SirenRed,
-                    modifier = Modifier.size(20.dp).clickable {
-                        scope.launch { dao.delete(r.id) }
-                    }
-                )
+                Icon(Icons.Filled.Delete, null, tint = SirenRed,
+                    modifier = Modifier.size(20.dp).clickable { scope.launch { dao.delete(r.id) } })
             }
         }
     }
@@ -441,38 +485,54 @@ fun TracksScreen(dao: TrackDao) {
     val tracks by dao.observeTracks().collectAsState(initial = emptyList())
     val fmt = remember { SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr")) }
     val scope = rememberCoroutineScope()
+    var stats by remember { mutableStateOf<Map<String, Triple<Int, Long, Double?>>>(emptyMap()) }
+
+    LaunchedEffect(tracks) {
+        val map = mutableMapOf<String, Triple<Int, Long, Double?>>()
+        tracks.forEach { t ->
+            val count = dao.countPointsForTrack(t.id)
+            val avg = dao.avgSpeedForTrack(t.id)
+            val durationMs = ((t.endTime ?: System.currentTimeMillis()) - t.startTime).coerceAtLeast(0L)
+            map[t.id] = Triple(count, durationMs, avg)
+        }
+        stats = map
+    }
+
     Column(Modifier.fillMaxSize().background(SirenBackground).padding(24.dp).verticalScroll(rememberScrollState())) {
         Text("IZLER", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = SirenTextPrimary)
         Spacer(Modifier.height(16.dp))
-        if (tracks.isEmpty()) {
-            Text("Henuz kayitli iz yok.", color = SirenTextSecondary)
-        }
+        if (tracks.isEmpty()) Text("Henuz kayitli iz yok.", color = SirenTextSecondary)
         tracks.forEach { t ->
-            Row(
-                Modifier.fillMaxWidth().padding(vertical = 6.dp).clip(RoundedCornerShape(12.dp))
-                    .background(SirenCard).padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            val s = stats[t.id]
+            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp).clip(RoundedCornerShape(12.dp))
+                .background(SirenCard).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.Timeline, null, tint = SirenGreen)
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text(t.name, color = SirenTextPrimary, fontWeight = FontWeight.SemiBold)
                     Text(fmt.format(Date(t.startTime)), color = SirenTextSecondary, fontSize = 12.sp)
+                    if (s != null) {
+                        val durMin = s.second / 60000L
+                        val avgStr = s.third?.let { "%.1f".format(it) } ?: "--"
+                        Row {
+                            Text("${s.first} nokta", color = SirenTextSecondary, fontSize = 11.sp)
+                            Spacer(Modifier.width(10.dp))
+                            Text("${durMin} dk", color = SirenTrackYellow, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.width(10.dp))
+                            Text("ort $avgStr kts", color = SirenTextSecondary, fontSize = 11.sp)
+                        }
+                    }
                 }
                 Spacer(Modifier.weight(1f))
                 if (!t.isRecording) {
-                    Icon(
-                        Icons.Filled.Share, null, tint = SirenPrimary,
+                    Icon(Icons.Filled.Share, null, tint = SirenPrimary,
                         modifier = Modifier.size(20.dp).clickable {
                             scope.launch {
                                 val tr = dao.getTrackById(t.id)
                                 val pts = dao.getPointsForTrack(t.id)
-                                if (tr != null && pts.isNotEmpty()) {
-                                    shareGpx(context, trackToGpx(tr, pts), "siren-track.gpx")
-                                }
+                                if (tr != null && pts.isNotEmpty()) shareGpx(context, trackToGpx(tr, pts), "siren-track.gpx")
                             }
-                        }
-                    )
+                        })
                     Spacer(Modifier.width(12.dp))
                 }
                 Text(if (t.isRecording) "KAYITTA" else "BITTI",
@@ -484,10 +544,8 @@ fun TracksScreen(dao: TrackDao) {
 }
 
 private fun shareGpx(context: Context, gpxContent: String, filename: String) {
-    val gpxDir = File(context.cacheDir, "gpx")
-    gpxDir.mkdirs()
-    val gpxFile = File(gpxDir, filename)
-    gpxFile.writeText(gpxContent)
+    val gpxDir = File(context.cacheDir, "gpx"); gpxDir.mkdirs()
+    val gpxFile = File(gpxDir, filename); gpxFile.writeText(gpxContent)
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", gpxFile)
     val shareIntent = Intent(Intent.ACTION_SEND).apply {
         type = "application/gpx+xml"
@@ -512,23 +570,19 @@ fun SideNav(selected: SirenTab, onSelect: (SirenTab) -> Unit) {
         }
         Spacer(Modifier.height(18.dp))
         SirenTab.entries.forEach { tab ->
-            NavItem(tab, tab == selected) { onSelect(tab) }
-            Spacer(Modifier.height(4.dp))
+            NavItem(tab, tab == selected) { onSelect(tab) }; Spacer(Modifier.height(4.dp))
         }
-        Spacer(Modifier.weight(1f))
-        OfflineBadge()
+        Spacer(Modifier.weight(1f)); OfflineBadge()
     }
 }
 
 @Composable
 private fun NavItem(tab: SirenTab, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-            .background(if (selected) SirenPrimary else Color.Transparent)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+        .background(if (selected) SirenPrimary else Color.Transparent)
+        .clickable(onClick = onClick)
+        .padding(horizontal = 12.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically) {
         Icon(tab.icon, tab.title, tint = if (selected) Color.White else SirenTextSecondary, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(12.dp))
         Text(tab.title, color = if (selected) Color.White else SirenTextPrimary, fontSize = 14.sp)
@@ -537,10 +591,8 @@ private fun NavItem(tab: SirenTab, selected: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun OfflineBadge() {
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFF0F2A1D)).padding(10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFF0F2A1D)).padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Filled.CheckCircle, null, tint = SirenGreen, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
         Column {
@@ -552,34 +604,48 @@ private fun OfflineBadge() {
 
 @Composable
 fun MapScreen(
-    pos: MutableState<GeoPoint?>,
-    speedKts: MutableState<Float?>,
-    courseDeg: MutableState<Float?>,
-    follow: MutableState<Boolean>,
-    trackPoints: MutableState<List<GeoPoint>>,
-    recording: MutableState<Boolean>,
-    onRecordToggle: () -> Unit,
-    waypoints: List<WaypointEntity>,
-    onAddWaypoint: (GeoPoint) -> Unit,
-    routes: List<RouteEntity>,
-    routeDao: RouteDao
+    pos: MutableState<GeoPoint?>, speedKts: MutableState<Float?>, courseDeg: MutableState<Float?>,
+    follow: MutableState<Boolean>, trackPoints: MutableState<List<GeoPoint>>,
+    recording: MutableState<Boolean>, onRecordToggle: () -> Unit,
+    waypoints: List<WaypointEntity>, onAddWaypoint: (GeoPoint) -> Unit,
+    routes: List<RouteEntity>, routeDao: RouteDao, settings: SirenSettings
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var showDownload by remember { mutableStateOf(false) }
+    var showLayers by remember { mutableStateOf(false) }
     val routePlanner = remember { mutableStateOf<List<GeoPoint>>(emptyList()) }
     var planningMode by remember { mutableStateOf(false) }
+    var mapStyle by remember { mutableStateOf(settings.mapStyle) }
+    val speedUnit by remember { mutableStateOf(settings.speedUnit) }
+    var searchQuery by remember { mutableStateOf("") }
+    var showSearch by remember { mutableStateOf(false) }
+    var searchResultsWp by remember { mutableStateOf<List<WaypointEntity>>(emptyList()) }
+    var searchResultsRt by remember { mutableStateOf<List<RouteEntity>>(emptyList()) }
+    var focusTarget by remember { mutableStateOf<GeoPoint?>(null) }
+
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.length >= 2) {
+            searchResultsWp = wpDao.search(searchQuery)
+            searchResultsRt = routeDao.search(searchQuery)
+            showSearch = true
+        } else {
+            searchResultsWp = emptyList()
+            searchResultsRt = emptyList()
+            showSearch = false
+        }
+    }
 
     val mapView = remember {
         val cfg = Configuration.getInstance()
         cfg.load(context, context.getSharedPreferences("osmdroid", 0))
         cfg.osmdroidBasePath = File(context.filesDir, "osmdroid")
         cfg.osmdroidTileCache = File(context.filesDir, "osmdroid/tiles")
-        cfg.userAgentValue = "SIREN/0.9.0"
+        cfg.userAgentValue = "SIREN/0.10.0"
         MapView(context).apply {
-            setTileSource(TileSourceFactory.MAPNIK)
+            setTileSource(tileSourceFor(settings.mapStyle))
             setMultiTouchControls(true)
-            zoomController.setVisibility(Visibility.NEVER)
+            zoomController.setVisibility(OsmVisibility.NEVER)
             controller.setZoom(14.0)
             controller.setCenter(GeoPoint(36.9582, 27.4428))
             setOnTouchListener { _, e ->
@@ -595,43 +661,44 @@ fun MapScreen(
         }
     }
 
+    LaunchedEffect(mapStyle) {
+        mapView.setTileSource(tileSourceFor(mapStyle))
+        settings.mapStyle = mapStyle
+        mapView.invalidate()
+    }
+
+    LaunchedEffect(focusTarget) {
+        focusTarget?.let { p ->
+            mapView.controller.animateTo(p, 15.0, 500L)
+            mapView.invalidate()
+        }
+    }
+
     LaunchedEffect(Unit) {
         val receiver = object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
-                if (planningMode) {
-                    routePlanner.value = routePlanner.value + p
-                    return true
-                }
+                if (planningMode) { routePlanner.value = routePlanner.value + p; return true }
                 return false
             }
             override fun longPressHelper(p: GeoPoint): Boolean {
-                if (!planningMode) onAddWaypoint(p)
-                return true
+                if (!planningMode) onAddWaypoint(p); return true
             }
         }
         mapView.overlays.add(0, MapEventsOverlay(receiver))
         mapView.invalidate()
     }
 
-    val trackLine = remember {
-        Polyline(mapView).apply {
-            outlinePaint.color = android.graphics.Color.parseColor("#F2C94C")
-            outlinePaint.strokeWidth = 8f
-        }
-    }
-    val routePlanLine = remember {
-        Polyline(mapView).apply {
-            outlinePaint.color = android.graphics.Color.parseColor("#38BDF8")
-            outlinePaint.strokeWidth = 6f
-        }
-    }
+    val trackLine = remember { Polyline(mapView).apply {
+        outlinePaint.color = android.graphics.Color.parseColor("#F2C94C")
+        outlinePaint.strokeWidth = 8f
+    }}
+    val routePlanLine = remember { Polyline(mapView).apply {
+        outlinePaint.color = android.graphics.Color.parseColor("#38BDF8")
+        outlinePaint.strokeWidth = 6f
+    }}
     val savedRouteLines = remember { mutableListOf<Polyline>() }
 
-    LaunchedEffect(Unit) {
-        mapView.overlays.add(trackLine)
-        mapView.overlays.add(routePlanLine)
-        mapView.invalidate()
-    }
+    LaunchedEffect(Unit) { mapView.overlays.add(trackLine); mapView.overlays.add(routePlanLine); mapView.invalidate() }
     LaunchedEffect(trackPoints.value) { trackLine.setPoints(trackPoints.value); mapView.invalidate() }
     LaunchedEffect(routePlanner.value) { routePlanLine.setPoints(routePlanner.value); mapView.invalidate() }
 
@@ -645,8 +712,7 @@ fun MapScreen(
     LaunchedEffect(pos.value) {
         pos.value?.let { p ->
             if (!mapView.overlays.contains(boatMarker)) {
-                mapView.overlays.add(boatMarker)
-                mapView.controller.setZoom(15.0)
+                mapView.overlays.add(boatMarker); mapView.controller.setZoom(15.0)
             }
             boatMarker.position = p
             boatMarker.rotation = courseDeg.value ?: 0f
@@ -665,8 +731,7 @@ fun MapScreen(
                 title = wp.name
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
             }
-            wpMarkers.add(m)
-            mapView.overlays.add(m)
+            wpMarkers.add(m); mapView.overlays.add(m)
         }
         mapView.invalidate()
     }
@@ -682,8 +747,7 @@ fun MapScreen(
                     outlinePaint.strokeWidth = 5f
                     setPoints(pts)
                 }
-                savedRouteLines.add(line)
-                mapView.overlays.add(line)
+                savedRouteLines.add(line); mapView.overlays.add(line)
             }
         }
         mapView.invalidate()
@@ -693,12 +757,19 @@ fun MapScreen(
 
     Box(Modifier.fillMaxSize().clipToBounds()) {
         AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
-        MapTopBar()
+        MapTopBar(
+            searchQuery = searchQuery,
+            onSearchChange = { searchQuery = it },
+            showSearch = showSearch,
+            searchResultsWp = searchResultsWp,
+            searchResultsRt = searchResultsRt,
+            onFocus = { p -> focusTarget = p; follow.value = false }
+        )
         MapControls(
             onLocate = { follow.value = true; pos.value?.let { mapView.controller.animateTo(it); mapView.invalidate() } },
             onZoomIn = { mapView.controller.zoomIn(); mapView.invalidate() },
             onZoomOut = { mapView.controller.zoomOut(); mapView.invalidate() },
-            onLayers = { showDownload = !showDownload },
+            onLayers = { showLayers = !showLayers },
             onPlanRoute = {
                 if (planningMode && routePlanner.value.size >= 2) {
                     val id = UUID.randomUUID().toString()
@@ -710,24 +781,120 @@ fun MapScreen(
                             routeDao.insertPoint(RoutePointEntity(0, id, p.latitude, p.longitude, idx, null))
                         }
                     }
-                    routePlanner.value = emptyList()
-                    planningMode = false
+                    routePlanner.value = emptyList(); planningMode = false
                 } else {
                     planningMode = !planningMode
                     if (!planningMode) routePlanner.value = emptyList()
                 }
             },
             planningMode = planningMode,
-            onCancelPlan = {
-                planningMode = false
-                routePlanner.value = emptyList()
-            }
+            onCancelPlan = { planningMode = false; routePlanner.value = emptyList() }
         )
-        BottomDataBar(speedKts, courseDeg)
+        val displaySpeed = speedKts.value?.let { (it * speedUnit.factor / 1.94384) }
+        BottomDataBar(displaySpeed, courseDeg, speedUnit)
         ScaleBar()
         RecordButton(recording, onRecordToggle)
+        if (showLayers) LayersPanel(currentStyle = mapStyle, onSelectStyle = { mapStyle = it },
+            onDownload = { showDownload = true; showLayers = false },
+            onClose = { showLayers = false })
         if (showDownload) DownloadPanel(mapView) { showDownload = false }
         if (planningMode) RoutePlanOverlay(routePlanner.value)
+    }
+}
+
+@Composable
+private fun BoxScope.LayersPanel(
+    currentStyle: MapStyle,
+    onSelectStyle: (MapStyle) -> Unit,
+    onDownload: () -> Unit,
+    onClose: () -> Unit
+) {
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)).clickable { onClose() }) {
+        Column(
+            Modifier.align(Alignment.Center).width(320.dp)
+                .clip(RoundedCornerShape(14.dp)).background(SirenCard).padding(20.dp)
+        ) {
+            Text("KATMANLAR", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = SirenTextPrimary)
+            Spacer(Modifier.height(14.dp))
+            Text("HARITA KAYNAGI", color = SirenTextSecondary, fontSize = 11.sp, letterSpacing = 1.sp)
+            Spacer(Modifier.height(8.dp))
+            MapStyle.values().forEach { s ->
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(10.dp))
+                        .background(if (currentStyle == s) SirenPrimary else SirenPanel)
+                        .clickable { onSelectStyle(s) }
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Filled.Map, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text(s.label, color = Color.White, fontWeight = FontWeight.SemiBold)
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(SirenGreen)
+                .clickable { onDownload() }.padding(12.dp), contentAlignment = Alignment.Center) {
+                Text("CEVRIMDISI HARITA INDIR", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun BoxScope.MapTopBar(
+    searchQuery: String,
+    onSearchChange: (String) -> Unit,
+    showSearch: Boolean,
+    searchResultsWp: List<WaypointEntity>,
+    searchResultsRt: List<RouteEntity>,
+    onFocus: (GeoPoint) -> Unit
+) {
+    Row(Modifier.align(Alignment.TopStart).padding(12.dp), verticalAlignment = Alignment.Top) {
+        DarkIconButton(Icons.Filled.Menu)
+        Spacer(Modifier.width(10.dp))
+        Column {
+            Row(Modifier.width(280.dp).clip(RoundedCornerShape(10.dp)).background(SirenPanel)
+                .padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Search, null, tint = SirenTextSecondary, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                androidx.compose.foundation.text.BasicTextField(
+                    value = searchQuery,
+                    onValueChange = onSearchChange,
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = androidx.compose.ui.text.TextStyle(color = SirenTextPrimary, fontSize = 13.sp)
+                )
+            }
+            if (showSearch && (searchResultsWp.isNotEmpty() || searchResultsRt.isNotEmpty())) {
+                Spacer(Modifier.height(6.dp))
+                Column(Modifier.width(280.dp).clip(RoundedCornerShape(10.dp)).background(SirenCard).padding(6.dp)) {
+                    searchResultsWp.forEach { wp ->
+                        Row(Modifier.fillMaxWidth().clickable { onFocus(GeoPoint(wp.lat, wp.lon)); onSearchChange("") }
+                            .padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.Place, null, tint = SirenTrackYellow, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(wp.name, color = SirenTextPrimary, fontSize = 12.sp)
+                        }
+                    }
+                    searchResultsRt.forEach { r ->
+                        Row(Modifier.fillMaxWidth().clickable { onSearchChange("") }.padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.AltRoute, null, tint = SirenRouteBlue, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(r.name, color = SirenTextPrimary, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Box(Modifier.align(Alignment.TopCenter).padding(top = 12.dp).width(320.dp).clip(RoundedCornerShape(10.dp))
+        .background(SirenPanel).padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+        Text("B   330   K   30   D", color = SirenTextSecondary, fontSize = 11.sp, letterSpacing = 2.sp)
+    }
+    Box(Modifier.align(Alignment.TopEnd).padding(12.dp).clip(RoundedCornerShape(10.dp))
+        .background(SirenPanel).padding(horizontal = 16.dp, vertical = 10.dp)) {
+        Text("3D", color = SirenTextPrimary, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -735,11 +902,9 @@ fun MapScreen(
 private fun BoxScope.RoutePlanOverlay(points: List<GeoPoint>) {
     val nm = routeTotalNm(points)
     val etaMin = if (nm > 0) (nm / 5.0) * 60.0 else 0.0
-    Box(
-        Modifier.align(Alignment.TopCenter).padding(top = 64.dp)
-            .clip(RoundedCornerShape(12.dp)).background(SirenPrimary.copy(alpha = 0.95f))
-            .padding(horizontal = 18.dp, vertical = 10.dp)
-    ) {
+    Box(Modifier.align(Alignment.TopCenter).padding(top = 64.dp)
+        .clip(RoundedCornerShape(12.dp)).background(SirenPrimary.copy(alpha = 0.95f))
+        .padding(horizontal = 18.dp, vertical = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("ROTA PLANLA", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
             Spacer(Modifier.width(16.dp))
@@ -754,44 +919,17 @@ private fun BoxScope.RoutePlanOverlay(points: List<GeoPoint>) {
 
 @Composable
 private fun BoxScope.RecordButton(recording: MutableState<Boolean>, onClick: () -> Unit) {
-    Box(
-        Modifier.align(Alignment.BottomEnd).padding(16.dp).size(56.dp)
-            .clip(CircleShape).background(if (recording.value) SirenRed else SirenPrimary)
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center
-    ) {
+    Box(Modifier.align(Alignment.BottomEnd).padding(16.dp).size(56.dp)
+        .clip(CircleShape).background(if (recording.value) SirenRed else SirenPrimary)
+        .clickable { onClick() }, contentAlignment = Alignment.Center) {
         Icon(if (recording.value) Icons.Filled.Stop else Icons.Filled.FiberManualRecord, "Seyir kaydi", tint = Color.White)
     }
 }
 
 @Composable
-private fun BoxScope.MapTopBar() {
-    Row(Modifier.align(Alignment.TopStart).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        DarkIconButton(Icons.Filled.Menu)
-        Spacer(Modifier.width(10.dp))
-        Row(Modifier.width(240.dp).clip(RoundedCornerShape(10.dp)).background(SirenPanel).padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.Search, null, tint = SirenTextSecondary, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Konum ara", color = SirenTextSecondary, fontSize = 13.sp)
-        }
-    }
-    Box(Modifier.align(Alignment.TopCenter).padding(top = 12.dp).width(320.dp).clip(RoundedCornerShape(10.dp)).background(SirenPanel).padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
-        Text("B   330   K   30   D", color = SirenTextSecondary, fontSize = 11.sp, letterSpacing = 2.sp)
-    }
-    Box(Modifier.align(Alignment.TopEnd).padding(12.dp).clip(RoundedCornerShape(10.dp)).background(SirenPanel).padding(horizontal = 16.dp, vertical = 10.dp)) {
-        Text("3D", color = SirenTextPrimary, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
 private fun BoxScope.MapControls(
-    onLocate: () -> Unit,
-    onZoomIn: () -> Unit,
-    onZoomOut: () -> Unit,
-    onLayers: () -> Unit,
-    onPlanRoute: () -> Unit,
-    planningMode: Boolean,
-    onCancelPlan: () -> Unit
+    onLocate: () -> Unit, onZoomIn: () -> Unit, onZoomOut: () -> Unit,
+    onLayers: () -> Unit, onPlanRoute: () -> Unit, planningMode: Boolean, onCancelPlan: () -> Unit
 ) {
     Column(Modifier.align(Alignment.CenterStart).padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         DarkIconButton(Icons.Filled.MyLocation, onLocate)
@@ -802,28 +940,26 @@ private fun BoxScope.MapControls(
             tint = if (planningMode) Color.White else SirenTextPrimary,
             bg = if (planningMode) SirenRouteBlue else SirenPanel)
         if (planningMode) {
-            DarkIconButton(Icons.Filled.Close, onCancelPlan,
-                tint = Color.White, bg = SirenRed)
+            DarkIconButton(Icons.Filled.Close, onCancelPlan, tint = Color.White, bg = SirenRed)
         }
     }
 }
 
 @Composable
-private fun DarkIconButton(
-    icon: ImageVector,
-    onClick: () -> Unit = {},
-    tint: Color = SirenTextPrimary,
-    bg: Color = SirenPanel
-) {
-    Box(Modifier.size(42.dp).clip(RoundedCornerShape(10.dp)).background(bg).clickable { onClick() }, contentAlignment = Alignment.Center) {
+private fun DarkIconButton(icon: ImageVector, onClick: () -> Unit = {},
+    tint: Color = SirenTextPrimary, bg: Color = SirenPanel) {
+    Box(Modifier.size(42.dp).clip(RoundedCornerShape(10.dp)).background(bg).clickable { onClick() },
+        contentAlignment = Alignment.Center) {
         Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
     }
 }
 
 @Composable
-private fun BoxScope.BottomDataBar(speedKts: MutableState<Float?>, courseDeg: MutableState<Float?>) {
-    Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp).clip(RoundedCornerShape(14.dp)).background(SirenPanel.copy(alpha = 0.95f)).padding(horizontal = 22.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(26.dp)) {
-        DataCell("SOG", speedKts.value?.let { "%.1f".format(it) } ?: "--", "kts")
+private fun BoxScope.BottomDataBar(speedKts: MutableState<Float?>, courseDeg: MutableState<Float?>, unit: SpeedUnit) {
+    Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp).clip(RoundedCornerShape(14.dp))
+        .background(SirenPanel.copy(alpha = 0.95f)).padding(horizontal = 22.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(26.dp)) {
+        DataCell("HIZ", speedKts.value?.let { "%.1f".format(it) } ?: "--", unit.key)
         DataCell("COG", courseDeg.value?.let { "%.0f".format(it) } ?: "--", "T")
         DataCell("DERINLIK", "42.7", "m")
         DataCell("ETA", "14:35", "")
@@ -886,7 +1022,6 @@ private fun TelemetryCard(pos: MutableState<GeoPoint?>, speedKts: MutableState<F
 private fun WeatherCard(pos: MutableState<GeoPoint?>) {
     var data by remember { mutableStateOf<WeatherData?>(null) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
-
     LaunchedEffect(pos.value) {
         pos.value?.let { p ->
             val now = System.currentTimeMillis()
@@ -897,7 +1032,6 @@ private fun WeatherCard(pos: MutableState<GeoPoint?>) {
             }
         }
     }
-
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(SirenCard).padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Filled.Air, null, tint = SirenPrimary, modifier = Modifier.size(16.dp))
@@ -905,9 +1039,7 @@ private fun WeatherCard(pos: MutableState<GeoPoint?>) {
             Text("HAVA DURUMU", fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = SirenTextPrimary)
         }
         Spacer(Modifier.height(10.dp))
-        if (data == null && errorMsg == null) {
-            Text("Veri yukleniyor...", color = SirenTextSecondary, fontSize = 12.sp)
-        }
+        if (data == null && errorMsg == null) Text("Veri yukleniyor...", color = SirenTextSecondary, fontSize = 12.sp)
         errorMsg?.let { Text(it, color = SirenRed, fontSize = 12.sp) }
         data?.let { w ->
             Text("RUZGAR", fontSize = 10.sp, letterSpacing = 1.sp, color = SirenTextSecondary)
@@ -957,9 +1089,11 @@ private fun SonarCard() {
             Text("m", fontSize = 12.sp, color = SirenTextSecondary, modifier = Modifier.padding(bottom = 6.dp))
         }
         Spacer(Modifier.height(10.dp))
-        Box(Modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(10.dp)).background(Brush.verticalGradient(listOf(Color(0xFF061225), Color(0xFF0B2A55), Color(0xFFB4530A), Color(0xFFE2542A)))))
+        Box(Modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(10.dp)).background(
+            Brush.verticalGradient(listOf(Color(0xFF061225), Color(0xFF0B2A55), Color(0xFFB4530A), Color(0xFFE2542A)))))
         Spacer(Modifier.height(10.dp))
-        Box(Modifier.size(44.dp).clip(CircleShape).background(SirenPrimary).align(Alignment.CenterHorizontally), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(44.dp).clip(CircleShape).background(SirenPrimary).align(Alignment.CenterHorizontally),
+            contentAlignment = Alignment.Center) {
             Icon(Icons.Filled.Pause, null, tint = Color.White)
         }
     }

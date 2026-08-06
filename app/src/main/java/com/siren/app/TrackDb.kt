@@ -100,6 +100,10 @@ interface TrackDao {
     suspend fun getPointsForTrack(trackId: String): List<TrackPointEntity>
     @Query("SELECT * FROM tracks WHERE id = :id")
     suspend fun getTrackById(id: String): TrackEntity?
+    @Query("SELECT COUNT(*) FROM track_points WHERE trackId = :trackId")
+    suspend fun countPointsForTrack(trackId: String): Int
+    @Query("SELECT AVG(speedKnots) FROM track_points WHERE trackId = :trackId")
+    suspend fun avgSpeedForTrack(trackId: String): Double?
 }
 
 @Dao
@@ -109,6 +113,8 @@ interface WaypointDao {
     fun observeAll(): Flow<List<WaypointEntity>>
     @Query("SELECT * FROM waypoints ORDER BY createdAt DESC")
     suspend fun getAllOnce(): List<WaypointEntity>
+    @Query("SELECT * FROM waypoints WHERE name LIKE '%' || :q || '%' ORDER BY createdAt DESC")
+    suspend fun search(q: String): List<WaypointEntity>
     @Query("DELETE FROM waypoints WHERE id = :id")
     suspend fun delete(id: String)
 }
@@ -123,44 +129,23 @@ interface RouteDao {
     suspend fun getPointsForRoute(routeId: String): List<RoutePointEntity>
     @Query("SELECT * FROM routes WHERE id = :id")
     suspend fun getRouteById(id: String): RouteEntity?
+    @Query("SELECT * FROM routes WHERE name LIKE '%' || :q || '%' ORDER BY createdAt DESC")
+    suspend fun search(q: String): List<RouteEntity>
     @Query("DELETE FROM routes WHERE id = :id")
     suspend fun delete(id: String)
-    @Query("SELECT COALESCE(MAX(sortOrder), -1) FROM route_points WHERE routeId = :routeId")
-    suspend fun getMaxSortOrder(routeId: String): Int
+    @Query("SELECT COUNT(*) FROM route_points WHERE routeId = :routeId")
+    suspend fun countPointsForRoute(routeId: String): Int
 }
 
 val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
-        db.execSQL(
-            "CREATE TABLE IF NOT EXISTS waypoints (" +
-                "id TEXT NOT NULL PRIMARY KEY, " +
-                "name TEXT NOT NULL, " +
-                "lat REAL NOT NULL, " +
-                "lon REAL NOT NULL, " +
-                "createdAt INTEGER NOT NULL)"
-        )
+        db.execSQL("CREATE TABLE IF NOT EXISTS waypoints (id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL, lat REAL NOT NULL, lon REAL NOT NULL, createdAt INTEGER NOT NULL)")
     }
 }
-
 val MIGRATION_2_3 = object : Migration(2, 3) {
     override fun migrate(db: SupportSQLiteDatabase) {
-        db.execSQL(
-            "CREATE TABLE IF NOT EXISTS routes (" +
-                "id TEXT NOT NULL PRIMARY KEY, " +
-                "name TEXT NOT NULL, " +
-                "createdAt INTEGER NOT NULL, " +
-                "colorHex TEXT NOT NULL)"
-        )
-        db.execSQL(
-            "CREATE TABLE IF NOT EXISTS route_points (" +
-                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
-                "routeId TEXT NOT NULL, " +
-                "lat REAL NOT NULL, " +
-                "lon REAL NOT NULL, " +
-                "sortOrder INTEGER NOT NULL, " +
-                "name TEXT, " +
-                "FOREIGN KEY(routeId) REFERENCES routes(id) ON DELETE CASCADE)"
-        )
+        db.execSQL("CREATE TABLE IF NOT EXISTS routes (id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL, createdAt INTEGER NOT NULL, colorHex TEXT NOT NULL)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS route_points (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, routeId TEXT NOT NULL, lat REAL NOT NULL, lon REAL NOT NULL, sortOrder INTEGER NOT NULL, name TEXT, FOREIGN KEY(routeId) REFERENCES routes(id) ON DELETE CASCADE)")
         db.execSQL("CREATE INDEX IF NOT EXISTS index_route_points_routeId ON route_points(routeId)")
         db.execSQL("CREATE INDEX IF NOT EXISTS index_route_points_routeId_sortOrder ON route_points(routeId, sortOrder)")
     }
@@ -174,17 +159,12 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun trackDao(): TrackDao
     abstract fun waypointDao(): WaypointDao
     abstract fun routeDao(): RouteDao
-
     companion object {
-        @Volatile
-        private var INSTANCE: AppDatabase? = null
+        @Volatile private var INSTANCE: AppDatabase? = null
         fun getInstance(context: Context): AppDatabase =
             INSTANCE ?: synchronized(this) {
-                INSTANCE ?: Room.databaseBuilder(
-                    context.applicationContext,
-                    AppDatabase::class.java,
-                    "siren.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
+                INSTANCE ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "siren.db")
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
             }
     }
 }
