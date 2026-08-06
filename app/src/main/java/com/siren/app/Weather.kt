@@ -35,6 +35,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import org.osmdroid.util.GeoPoint
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -132,16 +133,17 @@ fun WeatherScreen(pos: MutableState<GeoPoint?>) {
         val p = pos.value
         if (p == null) {
             error = "GPS bekleniyor..."
-            return
-        }
-        if (loading) return
-        loading = true
-        error = null
-        scope.launch {
-            val d = Weather.fetch(p.latitude, p.longitude)
-            loading = false
-            data = d
-            if (d == null) error = "Hava verisi alinamadi (internet kontrol)"
+        } else {
+            if (!loading) {
+                loading = true
+                error = null
+                scope.launch {
+                    val d = Weather.fetch(p.latitude, p.longitude)
+                    loading = false
+                    data = d
+                    if (d == null) error = "Hava verisi alinamadi (internet kontrol)"
+                }
+            }
         }
     }
 
