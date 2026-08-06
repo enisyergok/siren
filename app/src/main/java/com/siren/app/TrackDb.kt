@@ -14,6 +14,10 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 @Entity(tableName = "tracks")
 data class TrackEntity(
@@ -68,6 +72,12 @@ interface TrackDao {
 
     @Query("SELECT * FROM tracks ORDER BY startTime DESC")
     fun observeTracks(): Flow<List<TrackEntity>>
+
+    @Query("SELECT * FROM track_points WHERE trackId = :trackId ORDER BY time ASC")
+    suspend fun getPointsForTrack(trackId: String): List<TrackPointEntity>
+
+    @Query("SELECT * FROM tracks WHERE id = :id")
+    suspend fun getTrackById(id: String): TrackEntity?
 }
 
 @Dao
@@ -77,6 +87,9 @@ interface WaypointDao {
 
     @Query("SELECT * FROM waypoints ORDER BY createdAt DESC")
     fun observeAll(): Flow<List<WaypointEntity>>
+
+    @Query("SELECT * FROM waypoints ORDER BY createdAt DESC")
+    suspend fun getAllOnce(): List<WaypointEntity>
 
     @Query("DELETE FROM waypoints WHERE id = :id")
     suspend fun delete(id: String)
@@ -117,3 +130,49 @@ abstract class AppDatabase : RoomDatabase() {
             }
     }
 }
+
+fun trackToGpx(track: TrackEntity, points: List<TrackPointEntity>): String {
+    val fmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
+    fmt.timeZone = TimeZone.getTimeZone("UTC")
+    
+    val sb = StringBuilder()
+    sb.appendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
+    sb.appendLine("<gpx version=\"1.1\" creator=\"SIREN\">")
+    sb.appendLine("  <trk>")
+    sb.appendLine("    <name>${escapeXml(track.name)}</name>")
+    sb.appendLine("    <trkseg>")
+    
+    points.forEach { p ->
+        sb.appendLine("      <trkpt lat=\"${p.lat}\" lon=\"${p.lon}\">")
+        sb.appendLine("        <time>${fmt.format(Date(p.time))}</time>")
+        sb.appendLine("        <speed>${p.speedKnots * 0.514444}</speed>")
+        sb.appendLine("      </trkpt>")
+    }
+    
+    sb.appendLine("    </trkseg>")
+    sb.appendLine("  </trk>")
+    sb.appendLine("</gpx>")
+    return sb.toString()
+}
+
+fun waypointsToGpx(waypoints: List<WaypointEntity>): String {
+    val sb = StringBuilder()
+    sb.appendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
+    sb.appendLine("<gpx version=\"1.1\" creator=\"SIREN\">")
+    
+    waypoints.forEach { wp ->
+        sb.appendLine("  <wpt lat=\"${wp.lat}\" lon=\"${wp.lon}\">")
+        sb.appendLine("    <name>${escapeXml(wp.name)}</name>")
+        sb.appendLine("  </wpt>")
+    }
+    
+    sb.appendLine("</gpx>")
+    return sb.toString()
+}
+
+private fun escapeXml(s: String): String =
+    s.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("'", "&apos;")

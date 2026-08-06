@@ -2,6 +2,7 @@ package com.siren.app
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationListener
@@ -49,6 +50,7 @@ import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.Water
@@ -79,6 +81,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapEventsReceiver
@@ -298,16 +301,36 @@ fun ComingSoon(title: String) {
 
 @Composable
 fun WaypointsScreen(dao: WaypointDao) {
+    val context = LocalContext.current
     val wps by dao.observeAll().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
     Column(Modifier.fillMaxSize().background(SirenBackground).padding(24.dp)) {
-        Text("WAYPOINT'LER", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = SirenTextPrimary)
-        Spacer(Modifier.height(6.dp))
-        Text("Haritada bir noktaya UZUN BASARAK waypoint ekleyebilirsin.", color = SirenTextSecondary, fontSize = 12.sp)
-        Spacer(Modifier.height(16.dp))
-        if (wps.isEmpty()) {
-            Text("Henuz waypoint yok.", color = SirenTextSecondary)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("WAYPOINT'LER", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = SirenTextPrimary)
+                Spacer(Modifier.height(6.dp))
+                Text("Haritada UZUN BAS = yeni waypoint.", color = SirenTextSecondary, fontSize = 12.sp)
+            }
+            if (wps.isNotEmpty()) {
+                Box(
+                    Modifier.clip(RoundedCornerShape(10.dp)).background(SirenPrimary)
+                        .clickable {
+                            scope.launch {
+                                shareGpx(context, waypointsToGpx(dao.getAllOnce()), "siren-waypoints.gpx")
+                            }
+                        }
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Share, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("GPX", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
         }
+        Spacer(Modifier.height(16.dp))
+        if (wps.isEmpty()) Text("Henuz waypoint yok.", color = SirenTextSecondary)
         wps.forEach { wp ->
             Row(
                 Modifier.fillMaxWidth().padding(vertical = 6.dp).clip(RoundedCornerShape(12.dp))
@@ -323,9 +346,7 @@ fun WaypointsScreen(dao: WaypointDao) {
                 Spacer(Modifier.weight(1f))
                 Icon(
                     Icons.Filled.Delete, null, tint = SirenRed,
-                    modifier = Modifier.size(20.dp).clickable {
-                        scope.launch { dao.delete(wp.id) }
-                    }
+                    modifier = Modifier.size(20.dp).clickable { scope.launch { dao.delete(wp.id) } }
                 )
             }
         }
@@ -334,13 +355,15 @@ fun WaypointsScreen(dao: WaypointDao) {
 
 @Composable
 fun TracksScreen(dao: TrackDao) {
+    val context = LocalContext.current
     val tracks by dao.observeTracks().collectAsState(initial = emptyList())
     val fmt = remember { SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr")) }
+    val scope = rememberCoroutineScope()
     Column(Modifier.fillMaxSize().background(SirenBackground).padding(24.dp)) {
         Text("IZLER", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = SirenTextPrimary)
         Spacer(Modifier.height(16.dp))
         if (tracks.isEmpty()) {
-            Text("Henuz kayitli iz yok. Harita ekranindaki kirmizi butonla seyir kaydi baslat.", color = SirenTextSecondary)
+            Text("Henuz kayitli iz yok.", color = SirenTextSecondary)
         }
         tracks.forEach { t ->
             Row(
@@ -355,12 +378,41 @@ fun TracksScreen(dao: TrackDao) {
                     Text(fmt.format(Date(t.startTime)), color = SirenTextSecondary, fontSize = 12.sp)
                 }
                 Spacer(Modifier.weight(1f))
+                if (!t.isRecording) {
+                    Icon(
+                        Icons.Filled.Share, null, tint = SirenPrimary,
+                        modifier = Modifier.size(20.dp).clickable {
+                            scope.launch {
+                                val tr = dao.getTrackById(t.id)
+                                val pts = dao.getPointsForTrack(t.id)
+                                if (tr != null && pts.isNotEmpty()) {
+                                    shareGpx(context, trackToGpx(tr, pts), "siren-track.gpx")
+                                }
+                            }
+                        }
+                    )
+                    Spacer(Modifier.width(12.dp))
+                }
                 Text(if (t.isRecording) "KAYITTA" else "BITTI",
                     color = if (t.isRecording) SirenRed else SirenTextSecondary,
                     fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
+}
+
+private fun shareGpx(context: Context, gpxContent: String, filename: String) {
+    val gpxDir = File(context.cacheDir, "gpx")
+    gpxDir.mkdirs()
+    val gpxFile = File(gpxDir, filename)
+    gpxFile.writeText(gpxContent)
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", gpxFile)
+    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+        type = "application/gpx+xml"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(shareIntent, "GPX Paylas"))
 }
 
 @Composable
@@ -434,7 +486,7 @@ fun MapScreen(
         cfg.load(context, context.getSharedPreferences("osmdroid", 0))
         cfg.osmdroidBasePath = File(context.filesDir, "osmdroid")
         cfg.osmdroidTileCache = File(context.filesDir, "osmdroid/tiles")
-        cfg.userAgentValue = "SIREN/0.5.0"
+        cfg.userAgentValue = "SIREN/0.6.0"
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
