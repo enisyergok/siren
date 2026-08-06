@@ -273,9 +273,13 @@ fun SirenRoot() {
     }
     LaunchedEffect(Unit) {
         if (!hasLocPerm) permLauncher.launch(arrayOf(
-            Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+            Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION,
+            "android.permission.POST_NOTIFICATIONS"))
     }
     LaunchedEffect(hasLocPerm) { if (hasLocPerm) tracker.start() else tracker.stop() }
+    LaunchedEffect(Unit) {
+        ProximityAlarm.monitor(context, pos) { wpDao.getAllOnce() }
+    }
     DisposableEffect(Unit) { onDispose { tracker.stop() } }
 
     val onRecordToggle: () -> Unit = {
@@ -337,6 +341,8 @@ fun ComingSoon(title: String) {
 
 @Composable
 fun SettingsScreen(settings: SirenSettings) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var style by remember { mutableStateOf(settings.mapStyle) }
     var unit by remember { mutableStateOf(settings.speedUnit) }
     Column(Modifier.fillMaxSize().background(SirenBackground).padding(24.dp).verticalScroll(rememberScrollState())) {
@@ -368,7 +374,21 @@ fun SettingsScreen(settings: SirenSettings) {
             }
         }
         Spacer(Modifier.height(30.dp))
-        Text("SIREN v0.10.0", color = SirenTextSecondary, fontSize = 11.sp)
+        Text("VERI YEDEKLEME", color = SirenTextSecondary, fontSize = 12.sp, letterSpacing = 1.sp)
+        Spacer(Modifier.height(8.dp))
+        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(SirenPrimary)
+            .clickable {
+                scope.launch {
+                    val db = AppDatabase.getInstance(context)
+                    val f = BackupRestore.exportAll(context, db)
+                    BackupRestore.shareBackup(context, f)
+                }
+            }
+            .padding(14.dp), contentAlignment = Alignment.Center) {
+            Text("TUM VERILERI DISA AKTAR (JSON)", color = Color.White, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(24.dp))
+        Text("SIREN v0.11.0", color = SirenTextSecondary, fontSize = 11.sp)
     }
 }
 
