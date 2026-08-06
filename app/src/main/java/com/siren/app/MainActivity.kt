@@ -302,7 +302,7 @@ fun SirenRoot() {
             Spacer(Modifier.width(230.dp))
             Box(Modifier.weight(1f).clipToBounds()) {
                 when (selected) {
-                    SirenTab.Harita -> MapScreen(pos, speedKts, courseDeg, follow, trackPoints,
+                    SirenTab.Harita -> MapScreen(wpDao, pos, speedKts, courseDeg, follow, trackPoints,
                         recording, onRecordToggle, waypoints, onAddWaypoint, routes, routeDao, settings)
                     SirenTab.Rotalar -> RoutesScreen(routeDao)
                     SirenTab.Waypointler -> WaypointsScreen(wpDao)
@@ -603,7 +603,7 @@ private fun OfflineBadge() {
 }
 
 @Composable
-fun MapScreen(
+fun MapScreen(wpDao: WaypointDao, 
     pos: MutableState<GeoPoint?>, speedKts: MutableState<Float?>, courseDeg: MutableState<Float?>,
     follow: MutableState<Boolean>, trackPoints: MutableState<List<GeoPoint>>,
     recording: MutableState<Boolean>, onRecordToggle: () -> Unit,
@@ -790,8 +790,8 @@ fun MapScreen(
             planningMode = planningMode,
             onCancelPlan = { planningMode = false; routePlanner.value = emptyList() }
         )
-        val displaySpeed = speedKts.value?.let { (it * speedUnit.factor / 1.94384) }
-        BottomDataBar(displaySpeed, courseDeg, speedUnit)
+    val displaySpeed = speedKts.value?.let { (it * speedUnit.factor / 1.94384).toFloat() }
+        BottomDataBar(displaySpeed, courseDeg.value, speedUnit)
         ScaleBar()
         RecordButton(recording, onRecordToggle)
         if (showLayers) LayersPanel(currentStyle = mapStyle, onSelectStyle = { mapStyle = it },
@@ -955,7 +955,7 @@ private fun DarkIconButton(icon: ImageVector, onClick: () -> Unit = {},
 }
 
 @Composable
-private fun BoxScope.BottomDataBar(speedKts: MutableState<Float?>, courseDeg: MutableState<Float?>, unit: SpeedUnit) {
+private fun BoxScope.BottomDataBar(speedKts: Float?, courseDeg: Float?, unit: SpeedUnit) {
     Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp).clip(RoundedCornerShape(14.dp))
         .background(SirenPanel.copy(alpha = 0.95f)).padding(horizontal = 22.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(26.dp)) {
