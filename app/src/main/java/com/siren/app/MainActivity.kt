@@ -263,7 +263,7 @@ fun SirenRoot() {
             pos.value = GeoPoint(loc.latitude, loc.longitude)
             speedKts.value = loc.speed * 1.94384f
             courseDeg.value = loc.bearing
-            SirenNav.onLocation(GeoPoint(loc.latitude, loc.longitude), loc.speed * 1.94384f)
+            SirenNav.onLocation(GeoPoint(loc.latitude, loc.longitude), loc.speed * 1.94384f, loc.bearing)
             SirenNav.accuracy.value = loc.accuracy
             if (recording.value) {
                 val tid = currentTrackId.value
@@ -291,6 +291,7 @@ fun SirenRoot() {
         ProximityAlarm.monitor(context, pos) { wpDao.getAllOnce() }
     }
     DisposableEffect(Unit) { onDispose { tracker.stop() } }
+    HeadingSensor()
 
     val onRecordToggle: () -> Unit = {
         if (!recording.value) {
@@ -866,6 +867,12 @@ fun MapScreen(
         if (showDownload) DownloadPanel(mapView) { showDownload = false }
         if (planningMode) RoutePlanOverlay(routePlanner.value)
         NavBadgeColumn()
+        NavDataPanel()
+        MobButton()
+        ToolsColumn(mapView)
+        NightFilter()
+        CurrentArrowsController(mapView)
+        HeadingUpController(mapView)
     }
 }
 
