@@ -324,7 +324,7 @@ fun SirenRoot() {
                     else -> ComingSoon(selected.title)
                 }
             }
-            if (!settings.fullscreen) if (!settings.fullscreen) RightPanel(Modifier.width(260.dp).fillMaxHeight(), pos, speedKts, courseDeg)
+            if (!settings.fullscreen) if (!settings.fullscreen) RightPanel(Modifier.width(260.dp).fillMaxHeight(), pos, speedKts, courseDeg, onSettings = { selected = SirenTab.Ayarlar })
         }
         SideNav(selected = selected, onSelect = { selected = it })
     }
@@ -593,7 +593,7 @@ private fun shareGpx(context: Context, gpxContent: String, filename: String) {
 
 @Composable
 fun SideNav(selected: SirenTab, onSelect: (SirenTab) -> Unit) {
-    Column(Modifier.width(230.dp).fillMaxHeight().background(SirenPanel).padding(14.dp)) {
+    Column(Modifier.width(230.dp).fillMaxHeight().background(SirenPanel).padding(14.dp).verticalScroll(rememberScrollState())) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(44.dp).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
                 Icon(Icons.Filled.Anchor, "SIREN", tint = Color.Black, modifier = Modifier.size(26.dp))
@@ -608,7 +608,7 @@ fun SideNav(selected: SirenTab, onSelect: (SirenTab) -> Unit) {
         SirenTab.entries.forEach { tab ->
             NavItem(tab, tab == selected) { onSelect(tab) }; Spacer(Modifier.height(4.dp))
         }
-        Spacer(Modifier.weight(1f)); OfflineBadge()
+        OfflineBadge()
     }
 }
 
@@ -1030,22 +1030,22 @@ private fun BoxScope.ScaleBar() {
 }
 
 @Composable
-fun RightPanel(modifier: Modifier = Modifier, pos: MutableState<GeoPoint?>, speedKts: MutableState<Float?>, courseDeg: MutableState<Float?>) {
+fun RightPanel(modifier: Modifier = Modifier, pos: MutableState<GeoPoint?>, speedKts: MutableState<Float?>, courseDeg: MutableState<Float?>, onSettings: () -> Unit = {}) {
     Column(modifier.background(SirenBackground).padding(12.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        TelemetryCard(pos, speedKts, courseDeg)
+        TelemetryCard(pos, speedKts, courseDeg, onSettings)
         WeatherCard(pos)
         SonarCard()
     }
 }
 
 @Composable
-private fun TelemetryCard(pos: MutableState<GeoPoint?>, speedKts: MutableState<Float?>, courseDeg: MutableState<Float?>) {
+private fun TelemetryCard(pos: MutableState<GeoPoint?>, speedKts: MutableState<Float?>, courseDeg: MutableState<Float?>, onSettings: () -> Unit = {}) {
     val coords = pos.value?.let { formatCoords(it.latitude, it.longitude) }
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(SirenCard).padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("TELEMETRI", fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = SirenTextPrimary)
             Spacer(Modifier.weight(1f))
-            Icon(Icons.Filled.Settings, null, tint = SirenTextSecondary, modifier = Modifier.size(16.dp))
+            Icon(Icons.Filled.Settings, null, tint = SirenTextSecondary, modifier = Modifier.size(16.dp).clickable { onSettings() })
         }
         Spacer(Modifier.height(10.dp))
         TelemetryRow("HIZ", speedKts.value?.let { "%.1f".format(it) } ?: "--", "kts")
