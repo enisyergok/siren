@@ -160,7 +160,7 @@ fun KnotCanvas(art: Int) {
                 ln(pt(0.52f, 0.5f), pt(0.52f, 0.8f), tag)
             }
             5 -> { // Albright
-                drawArc(Color(0xFF38BDF8), 0f, 360f, false, pt(0.35f, 0.45f), 20f, style = Stroke(6f))
+                drawCircle(Color(0xFF38BDF8), radius = 20f, center = pt(0.35f, 0.45f), style = Stroke(6f))
                 for (i in 0..5) ci(pt(0.42f + i * 0.06f, 0.45f), 8f, main, 3f)
                 ln(pt(0.8f, 0.45f), pt(0.95f, 0.45f), tag)
                 ln(pt(0.42f, 0.35f), pt(0.42f, 0.12f), tag)
