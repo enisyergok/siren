@@ -1,3 +1,4 @@
+import com.siren.app.RegionFishPanel
 package com.siren.app
 
 import android.Manifest
