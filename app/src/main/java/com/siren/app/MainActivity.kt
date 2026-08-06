@@ -142,7 +142,9 @@ enum class SirenTab(val title: String, val icon: ImageVector) {
     GelgitAkinti("Gelgit ve Akinti", Icons.Filled.Water),
     Sonar("Sonar", Icons.Filled.Radar),
     Balog("Balik Gunlugu", Icons.Filled.DirectionsBoat),
+    AdvancedFishing("Ileri Balikci", Icons.Filled.Science),
     Balog("Balik Gunlugu", Icons.Filled.DirectionsBoat),
+    AdvancedFishing("Ileri Balikci", Icons.Filled.Science),
     Ayarlar("Ayarlar", Icons.Filled.Settings)
 }
 
