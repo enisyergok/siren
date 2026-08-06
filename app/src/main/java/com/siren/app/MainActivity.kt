@@ -855,6 +855,7 @@ fun MapScreen(
         BottomDataBar(displaySpeed, displayCourse, speedUnit)
         ScaleBar()
         RecordButton(recording, onRecordToggle)
+        CatchMarkersLayer(mapView)
         CatchButton()
         if (showLayers) LayersPanel(currentStyle = mapStyle, onSelectStyle = { mapStyle = it },
             onDownload = { showDownload = true; showLayers = false },
