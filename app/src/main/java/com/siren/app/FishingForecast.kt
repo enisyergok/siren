@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,7 +37,7 @@ import kotlin.math.tan
 
 object FishingCalc {
     const val SYNODIC = 29.53058867
-    private const val NEW_MOON_EPOCH = 947182440000.0 // 2000-01-06 18:14 UTC
+    private const val NEW_MOON_EPOCH = 947182440000.0
 
     fun moonAge(now: Long = System.currentTimeMillis()): Double {
         val days = (now - NEW_MOON_EPOCH) / 86400000.0
@@ -126,10 +127,15 @@ fun FishingBadge() {
     val lat = p?.latitude ?: 40.0
     val lon = p?.longitude ?: 27.0
     val score = FishingCalc.currentScore(lat, lon)
-    val (label, color) = when {
-        score >= 4 -> "BESLENME YUKSEK" to SirenGreen
-        score == 3 -> "BESLENME ORTA" to SirenTrackYellow
-        else -> "BESLENME DUSUK" to SirenTextSecondary
+    val label = when {
+        score >= 4 -> "BESLENME YUKSEK"
+        score == 3 -> "BESLENME ORTA"
+        else -> "BESLENME DUSUK"
+    }
+    val color = when {
+        score >= 4 -> SirenGreen
+        score == 3 -> SirenTrackYellow
+        else -> SirenTextSecondary
     }
     Box(Modifier.clip(RoundedCornerShape(8.dp)).background(SirenPanel.copy(alpha = 0.9f))
         .padding(horizontal = 10.dp, vertical = 6.dp)) {
@@ -157,7 +163,9 @@ fun FishingForecastCard(pos: MutableState<GeoPoint?>) {
         Text("EN IYI SAATLER", fontSize = 10.sp, letterSpacing = 1.sp, color = SirenTextSecondary)
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            slots.forEach { (h, s) ->
+            slots.forEach { slot ->
+                val h = slot.first
+                val s = slot.second
                 Column(Modifier.clip(RoundedCornerShape(10.dp)).background(SirenPanel).padding(horizontal = 12.dp, vertical = 8.dp)) {
                     Text("%02d:00".format(h), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Text("★".repeat(s), color = SirenTrackYellow, fontSize = 11.sp)
