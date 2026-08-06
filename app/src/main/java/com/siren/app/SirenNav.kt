@@ -14,6 +14,7 @@ object SirenNav {
     val accuracy = mutableStateOf<Float?>(null)
     val activeRoute = mutableStateOf<ActiveRouteInfo?>(null)
     var routeDao: RouteDao? = null
+    var catchDao: CatchDao? = null
 
     val tripStart = mutableStateOf<Long?>(null)
     val tripDistNm = mutableStateOf(0.0)

@@ -46,6 +46,7 @@ fun BoxScope.NavBadgeColumn() {
     ) {
         GpsQualityBadge()
         AnchorWatchBadge()
+        FishingBadge()
         FollowBadge()
     }
 }

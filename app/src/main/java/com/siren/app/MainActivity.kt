@@ -141,6 +141,7 @@ enum class SirenTab(val title: String, val icon: ImageVector) {
     AisTrafigi("AIS Trafigi", Icons.Filled.DirectionsBoat),
     GelgitAkinti("Gelgit ve Akinti", Icons.Filled.Water),
     Sonar("Sonar", Icons.Filled.Radar),
+    Balog("Balik Gunlugu", Icons.Filled.DirectionsBoat),
     Ayarlar("Ayarlar", Icons.Filled.Settings)
 }
 
@@ -236,6 +237,7 @@ fun SirenRoot() {
     val wpDao = db.waypointDao()
     val routeDao = db.routeDao()
     SirenNav.routeDao = routeDao
+    SirenNav.catchDao = db.catchDao()
     val scope = rememberCoroutineScope()
     val recording = remember { mutableStateOf(false) }
     val currentTrackId = remember { mutableStateOf<String?>(null) }
@@ -847,6 +849,7 @@ fun MapScreen(
         BottomDataBar(displaySpeed, displayCourse, speedUnit)
         ScaleBar()
         RecordButton(recording, onRecordToggle)
+        CatchButton()
         if (showLayers) LayersPanel(currentStyle = mapStyle, onSelectStyle = { mapStyle = it },
             onDownload = { showDownload = true; showLayers = false },
             onClose = { showLayers = false })

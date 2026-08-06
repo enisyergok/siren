@@ -88,6 +88,19 @@ data class RoutePointEntity(
     val name: String?
 )
 
+@Entity(tableName = "catches")
+data class CatchEntity(
+    @PrimaryKey val id: String,
+    val species: String,
+    val lengthCm: Double?,
+    val weightKg: Double?,
+    val count: Int,
+    val note: String?,
+    val lat: Double,
+    val lon: Double,
+    val time: Long
+)
+
 @Dao
 interface TrackDao {
     @Insert suspend fun insertTrack(track: TrackEntity)
@@ -137,6 +150,15 @@ interface RouteDao {
     suspend fun countPointsForRoute(routeId: String): Int
 }
 
+@Dao
+interface CatchDao {
+    @Insert suspend fun insert(c: CatchEntity)
+    @Query("SELECT * FROM catches ORDER BY time DESC")
+    fun observeAll(): Flow<List<CatchEntity>>
+    @Query("DELETE FROM catches WHERE id = :id")
+    suspend fun delete(id: String)
+}
+
 val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("CREATE TABLE IF NOT EXISTS waypoints (id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL, lat REAL NOT NULL, lon REAL NOT NULL, createdAt INTEGER NOT NULL)")
@@ -150,21 +172,27 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
         db.execSQL("CREATE INDEX IF NOT EXISTS index_route_points_routeId_sortOrder ON route_points(routeId, sortOrder)")
     }
 }
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS catches (id TEXT NOT NULL PRIMARY KEY, species TEXT NOT NULL, lengthCm REAL, weightKg REAL, count INTEGER NOT NULL, note TEXT, lat REAL NOT NULL, lon REAL NOT NULL, time INTEGER NOT NULL)")
+    }
+}
 
 @Database(
-    entities = [TrackEntity::class, TrackPointEntity::class, WaypointEntity::class, RouteEntity::class, RoutePointEntity::class],
-    version = 3
+    entities = [TrackEntity::class, TrackPointEntity::class, WaypointEntity::class, RouteEntity::class, RoutePointEntity::class, CatchEntity::class],
+    version = 4
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun trackDao(): TrackDao
     abstract fun waypointDao(): WaypointDao
     abstract fun routeDao(): RouteDao
+    abstract fun catchDao(): CatchDao
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
         fun getInstance(context: Context): AppDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "siren.db")
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
             }
     }
 }
