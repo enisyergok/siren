@@ -41,7 +41,7 @@ import kotlin.math.tan
 @Composable
 fun BoxScope.NavBadgeColumn() {
     Column(
-        Modifier.align(Alignment.BottomStart).padding(start = 14.dp, bottom = 70.dp),
+        Modifier.align(Alignment.CenterEnd).padding(end = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         GpsQualityBadge()
