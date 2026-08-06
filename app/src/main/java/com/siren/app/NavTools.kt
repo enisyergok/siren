@@ -66,6 +66,7 @@ class SwingCircleOverlay : Overlay() {
 fun BoxScope.ToolsColumn(mapView: MapView) {
     var showMeasure by remember { mutableStateOf(false) }
     var showAnchor by remember { mutableStateOf(false) }
+    var open by remember { mutableStateOf(false) }
     val night by SirenNav.nightMode
     val up by SirenNav.headingUp
     val line = remember { Polyline() }
@@ -73,12 +74,16 @@ fun BoxScope.ToolsColumn(mapView: MapView) {
 
     Column(
         Modifier.align(Alignment.CenterEnd).padding(end = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalAlignment = Alignment.End
     ) {
-        ToolBtn("📏") { showMeasure = !showMeasure }
-        ToolBtn("⚓") { showAnchor = true }
-        ToolBtn(if (up) "🧭" else "🧭") { SirenNav.headingUp.value = !up }
-        ToolBtn(if (night) "🌙" else "☀️") { SirenNav.nightMode.value = !night }
+        if (open) {
+            ToolBtn("📏") { showMeasure = true; open = false }
+            ToolBtn("⚓") { showAnchor = true; open = false }
+            ToolBtn("🧭") { SirenNav.headingUp.value = !up }
+            ToolBtn(if (night) "🌙" else "☀️") { SirenNav.nightMode.value = !night }
+        }
+        ToolBtn("🧰") { open = !open }
     }
 
     if (showMeasure) {

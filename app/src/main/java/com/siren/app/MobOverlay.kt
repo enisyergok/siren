@@ -26,7 +26,7 @@ fun BoxScope.MobButton() {
     val p by SirenNav.pos
 
     Box(
-        Modifier.align(Alignment.BottomEnd).padding(end = 164.dp, bottom = 16.dp)
+        Modifier.align(Alignment.BottomStart).padding(start = 14.dp, bottom = 64.dp)
             .size(56.dp).clip(CircleShape).background(if (mob != null) SirenRed else SirenPanel)
             .clickable { SirenNav.mob.value = if (mob != null) null else p },
         contentAlignment = Alignment.Center
