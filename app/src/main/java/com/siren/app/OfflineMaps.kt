@@ -41,6 +41,7 @@ import java.net.URL
 import kotlin.math.floor
 import kotlin.math.ln
 import kotlin.math.min
+import kotlin.math.max
 import kotlin.math.pow
 import kotlin.math.tan
 import kotlin.math.cos
@@ -88,7 +89,7 @@ object OfflineMaps {
                 for (x in r.xMin..r.xMax) {
                     for (y in r.yMin..r.yMax) {
                         done++
-                        val file = File(cache, src.getTileRelativeFilenameString(MapTileIndex.getIndex(r.z, x, y)))
+                        val file = File(cache, "Mapnik/${r.z}/$x/$y.png")
                         if (!file.exists()) {
                             runCatching {
                                 val con = URL("https://tile.openstreetmap.org/${r.z}/$x/$y.png")

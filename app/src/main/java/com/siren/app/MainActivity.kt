@@ -565,6 +565,7 @@ fun MapScreen(
 
     DisposableEffect(Unit) { onDispose { mapView.onDetach() } }
     var showDownload by remember { mutableStateOf(false) }
+    var showDownload by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize().clipToBounds()) {
         AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
@@ -577,6 +578,7 @@ fun MapScreen(
         BottomDataBar(speedKts, courseDeg)
         ScaleBar()
         RecordButton(recording, onRecordToggle)
+        if (showDownload) DownloadPanel(mapView) { showDownload = false }
         if (showDownload) DownloadPanel(mapView) { showDownload = false }
     }
 }
