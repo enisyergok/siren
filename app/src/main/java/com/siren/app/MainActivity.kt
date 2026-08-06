@@ -324,7 +324,7 @@ fun SirenRoot() {
                     else -> ComingSoon(selected.title)
                 }
             }
-            if (!settings.fullscreen) RightPanel(Modifier.width(260.dp).fillMaxHeight(), pos, speedKts, courseDeg)
+            if (!settings.fullscreen) if (!settings.fullscreen) RightPanel(Modifier.width(260.dp).fillMaxHeight(), pos, speedKts, courseDeg)
         }
         SideNav(selected = selected, onSelect = { selected = it })
     }
