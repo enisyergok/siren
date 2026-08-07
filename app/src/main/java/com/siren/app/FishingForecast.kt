@@ -71,78 +71,6 @@ object FishingCalc {
             else -> 0
         }
     }
-
-    fun multiFactorScore(pos: GeoPoint?, weather: WeatherData?): Int {
-        if (pos == null) return 0
-        val lat = pos.latitude
-        val lon = pos.longitude
-        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-
-        // 1. Solunar (ay fazi + gun saati) - %30
-        val lunarScore = scoreHour(lat, lon, hour)
-        val lunarNorm = (lunarScore / 5.0) * 30
-
-        // 2. Basinc trendi - %15
-        val pressureS = pressureScore()
-        val pressureNorm = ((pressureS + 2) / 4.0) * 15
-
-        // 3. Ruzgar - %15 (hafif iyi, siddetli kotu)
-        val windS = when {
-            weather == null -> 7.5
-            weather.windSpeedKnots < 5 -> 15.0
-            weather.windSpeedKnots < 10 -> 12.0
-            weather.windSpeedKnots < 15 -> 8.0
-            weather.windSpeedKnots < 20 -> 4.0
-            else -> 0.0
-        }
-
-        // 4. Dalga - %10
-        val waveS = when {
-            weather == null -> 5.0
-            weather.waveHeightMeters == null -> 5.0
-            weather.waveHeightMeters!! < 0.5 -> 10.0
-            weather.waveHeightMeters!! < 1.0 -> 7.0
-            weather.waveHeightMeters!! < 1.5 -> 4.0
-            else -> 0.0
-        }
-
-        // 5. Altin saat bonusu - %20
-        val timeBonus = if (hour in 5..8 || hour in 18..21) 20.0 else 5.0
-
-        // 6. Sicaklik (mevsime uygunluk) - %10
-        val tempS = weather?.temperatureC?.let {
-            if (it > 15 && it < 28) 10.0 else 3.0
-        } ?: 5.0
-
-        return (lunarNorm + pressureNorm + windS + waveS + timeBonus + tempS).toInt().coerceIn(0, 100)
-    }
-
-    fun scoreExplanation(score: Int, weather: WeatherData?): String {
-        val parts = mutableListOf<String>()
-        val trend = pressureTrend()
-        when (trend) {
-            "HIZLA DUSUYOR" -> parts.add("dusen basinc")
-            "DUSUYOR" -> parts.add("azalan basinc")
-            "SABIT" -> parts.add("stabil basinc")
-        }
-
-        weather?.let { w ->
-            if (w.windSpeedKnots < 10) parts.add("hafif ruzgar")
-            if (w.waveHeightMeters != null && w.waveHeightMeters!! < 0.5) parts.add("sakin deniz")
-        }
-
-        val age = moonAge()
-        val phase = when {
-            age < 1.5 || age > 28 -> "yeniay"
-            age in 6.0..8.5 -> "ilk dordun"
-            age in 13.0..16.0 -> "dolunay"
-            age in 21.0..23.5 -> "son dordun"
-            else -> "kresan/azalan"
-        }
-        parts.add("$phase donemi")
-
-        return if (parts.isEmpty()) "Analiz yapiliyor" else parts.take(3).joinToString(" + ")
-    }
     const val SYNODIC = 29.53058867
     private const val NEW_MOON_EPOCH = 947182440000.0
 
@@ -233,47 +161,57 @@ object FishingCalc {
 @Composable
 fun FishingBadge() {
     val p by SirenNav.pos
-    val w by SirenNav.weatherData
-    if (p == null) return
-
-    val score = FishingCalc.multiFactorScore(p, w)
-    if (score < 70) return
-
-    val (label, color) = when {
-        score >= 90 -> "MUKEMMEL" to SirenGreen
-        score >= 80 -> "COK IYI" to SirenGreen
-        score >= 70 -> "IYI" to SirenTrackYellow
-        else -> return
+    val lat = p?.latitude ?: 40.0
+    val lon = p?.longitude ?: 27.0
+    val score = FishingCalc.currentScore(lat, lon)
+    if (score < 4) return
+    val label = when {
+        score >= 4 -> "BESLENME YUKSEK"
+        score == 3 -> "BESLENME ORTA"
+        else -> "BESLENME DUSUK"
     }
-
-    val explanation = FishingCalc.scoreExplanation(score, w)
-
+    val color = when {
+        score >= 4 -> SirenGreen
+        score == 3 -> SirenTrackYellow
+        else -> SirenTextSecondary
+    }
     Box(Modifier.clip(RoundedCornerShape(8.dp)).background(SirenPanel.copy(alpha = 0.9f))
         .padding(horizontal = 10.dp, vertical = 6.dp)) {
-        Text("🎣 $label · $score · $explanation", color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text("🎣 $label", color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold)
     }
 }
 
 @Composable
-fun FishingBadge() {
-    val p by SirenNav.pos
-    val w by SirenNav.weatherData
-    if (p == null) return
+fun FishingForecastCard(pos: MutableState<GeoPoint?>) {
+    val p = pos.value
+    val lat = p?.latitude ?: 40.0
+    val lon = p?.longitude ?: 27.0
+    val age = FishingCalc.moonAge()
+    val illum = FishingCalc.illumination(age)
+    val slots = remember(p?.latitude?.toInt(), p?.longitude?.toInt()) { FishingCalc.bestSlots(lat, lon) }
 
-    val score = FishingCalc.multiFactorScore(p, w)
-    if (score < 70) return
-
-    val (label, color) = when {
-        score >= 90 -> "MUKEMMEL" to SirenGreen
-        score >= 80 -> "COK IYI" to SirenGreen
-        score >= 70 -> "IYI" to SirenTrackYellow
-        else -> return
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(SirenCard).padding(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("🎣 AV TAHMINI", fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = SirenTextPrimary)
+            Spacer(Modifier.weight(1f))
+            Text("${FishingCalc.phaseName(age)} · %${(illum * 100).toInt()}",
+                color = SirenTextSecondary, fontSize = 11.sp)
+        }
+        Spacer(Modifier.height(10.dp))
+        Text("EN IYI SAATLER", fontSize = 10.sp, letterSpacing = 1.sp, color = SirenTextSecondary)
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            slots.forEach { slot ->
+                val h = slot.first
+                val s = slot.second
+                Column(Modifier.clip(RoundedCornerShape(10.dp)).background(SirenPanel).padding(horizontal = 12.dp, vertical = 8.dp)) {
+                    Text("%02d:00".format(h), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("★".repeat(s), color = SirenTrackYellow, fontSize = 11.sp)
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text("Solunar: safak/alacakaranlik + ay gecisi hesabı", color = SirenTextSecondary, fontSize = 9.sp)
     }
-
-    val explanation = FishingCalc.scoreExplanation(score, w)
-
-    Box(Modifier.clip(RoundedCornerShape(8.dp)).background(SirenPanel.copy(alpha = 0.9f))
-        .padding(horizontal = 10.dp, vertical = 6.dp)) {
-        Text("🎣 $label · $score · $explanation", color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-    }
+    Spacer(Modifier.height(12.dp))
 }
