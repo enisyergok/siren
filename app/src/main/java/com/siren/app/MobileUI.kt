@@ -45,8 +45,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.siren.app.TrackDb
 import kotlinx.coroutines.delay
 import org.osmdroid.config.Configuration
+import org.osmdroid.tilesource.TileSourceFactory
+import org.osmdroid.tilesource.OnlineTileSourceBase
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.tilesource.OnlineTileSourceBase
 import org.osmdroid.tilesource.TileSourceFactory
@@ -56,6 +59,7 @@ import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Overlay
 import org.osmdroid.views.overlay.Polyline
+import androidx.compose.foundation.gestures.detectTapGestures
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -438,7 +442,7 @@ private fun BoxScope.InstrumentBar(pos: androidx.compose.runtime.State<GeoPoint?
         }
         "TRIP" -> "%.1f".format(SirenNav.tripDistNm.value) to C[3]
         "MAX" -> "%.1f".format(SirenNav.maxSpeed.value) to C[3]
-        else -> (if (ar != null) "SEYIR" else "BOS") to C[2]
+        else -> Pair(if (ar != null) "SEYIR" else "BOS", C[2])
     }
 
     Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
@@ -449,7 +453,7 @@ private fun BoxScope.InstrumentBar(pos: androidx.compose.runtime.State<GeoPoint?
             cells.forEachIndexed { i, key ->
                 val v = valOf(key)
                 Column(
-                    Modifier.weight(1f).clickable { }
+                    Modifier.clickable { }
                         .pointerInput(Unit) {
                             androidx.compose.foundation.gestures.detectTapGestures(onLongPress = { editSlot = i })
                         },
