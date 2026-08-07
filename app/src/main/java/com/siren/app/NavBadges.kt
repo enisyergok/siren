@@ -39,101 +39,54 @@ import kotlin.math.sin
 import kotlin.math.tan
 
 @Composable
-fun BoxScope.NavBadgeColumn() {
-    Column(
-        Modifier.align(Alignment.BottomCenter).padding(bottom = 120.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        GpsQualityBadge()
-        AnchorWatchBadge()
-        FishingBadge()
-        FollowBadge()
-    }
-}
-
-@Composable
-fun GpsQualityBadge() {
-    val acc by SirenNav.accuracy
-    val a = acc ?: return
-    val (label, color) = when {
-        a < 15f -> "GPS MUHTEM" to SirenGreen
-        a < 30f -> "GPS ORTA" to SirenTrackYellow
-        else -> "GPS ZAYIF" to SirenRed
-    }
+fun FishingBadge() {
+    val p by SirenNav.pos
+    val lat = p?.latitude ?: 40.0
+    val lon = p?.longitude ?: 27.0
+    val score = FishingCalc.currentScore(lat, lon)
+    if (score < 4) return
     Box(Modifier.clip(RoundedCornerShape(8.dp)).background(SirenPanel.copy(alpha = 0.9f))
         .padding(horizontal = 10.dp, vertical = 6.dp)) {
-        Text("$label · %.0fm".format(a), color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text("🎣 BESLENME YUKSEK", color = SirenGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
     }
 }
 
 @Composable
-fun AnchorWatchBadge() {
-    var anchored by remember { mutableStateOf<GeoPoint?>(null) }
-    var alarm by remember { mutableStateOf(false) }
-    var slowSince by remember { mutableStateOf<Long?>(null) }
+fun FishingBadge() {
     val p by SirenNav.pos
-
-    LaunchedEffect(p) {
-        val cur = p ?: return@LaunchedEffect
-        val sp = SirenNav.speedKts.value ?: 5f
-        val now = System.currentTimeMillis()
-        if (sp < 0.8f) {
-            val since = slowSince ?: now
-            if (slowSince == null) slowSince = now
-            if (anchored == null && now - since > 15000) { anchored = cur; alarm = false }
-        } else {
-            slowSince = null
-        }
-        anchored?.let { a ->
-            val d = haversineNm(a.latitude, a.longitude, cur.latitude, cur.longitude) * 1852.0
-            if (d > 50) alarm = true
-        }
-    }
-
-    val a = anchored
-    if (a == null) return
-
-    val cur = p
-    val distM = if (cur != null)
-        haversineNm(a.latitude, a.longitude, cur.latitude, cur.longitude) * 1852.0 else 0.0
-
-    Box(Modifier.clip(RoundedCornerShape(8.dp))
-        .background(if (alarm) SirenRed else SirenPanel.copy(alpha = 0.9f))
-        .clickable { anchored = null; alarm = false; slowSince = null }
+    val lat = p?.latitude ?: 40.0
+    val lon = p?.longitude ?: 27.0
+    val score = FishingCalc.currentScore(lat, lon)
+    if (score < 4) return
+    Box(Modifier.clip(RoundedCornerShape(8.dp)).background(SirenPanel.copy(alpha = 0.9f))
         .padding(horizontal = 10.dp, vertical = 6.dp)) {
-        Text(
-            if (alarm) "DEMIR TARAR! %.0fm".format(distM) else "DEMIR IZI · %.0fm".format(distM),
-            color = if (alarm) Color.White else SirenGreen,
-            fontSize = 11.sp, fontWeight = FontWeight.Bold
-        )
+        Text("🎣 BESLENME YUKSEK", color = SirenGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
     }
 }
 
 @Composable
-fun FollowBadge() {
-    val ar by SirenNav.activeRoute
+fun FishingBadge() {
     val p by SirenNav.pos
-    val a = ar ?: return
-
-    LaunchedEffect(p) {
-        val cur = p ?: return@LaunchedEffect
-        val info = SirenNav.activeRoute.value ?: return@LaunchedEffect
-        val target = info.points[info.leg]
-        val d = haversineNm(cur.latitude, cur.longitude, target.latitude, target.longitude)
-        if (d < 0.03 && info.leg < info.points.lastIndex) {
-            SirenNav.activeRoute.value = info.copy(leg = info.leg + 1)
-        }
-    }
-
-    val cur = p
-    val remain = if (cur != null) remainingNmFrom(a, cur) else 0.0
-    val etaMin = remain / 5.0 * 60.0
-
-    Box(Modifier.clip(RoundedCornerShape(8.dp)).background(SirenRouteBlue.copy(alpha = 0.9f))
-        .clickable { SirenNav.activeRoute.value = null }
+    val lat = p?.latitude ?: 40.0
+    val lon = p?.longitude ?: 27.0
+    val score = FishingCalc.currentScore(lat, lon)
+    if (score < 4) return
+    Box(Modifier.clip(RoundedCornerShape(8.dp)).background(SirenPanel.copy(alpha = 0.9f))
         .padding(horizontal = 10.dp, vertical = 6.dp)) {
-        Text("ROTA ${a.name} · ${a.leg + 1}/${a.points.size} · %.2f nm · ~%.0f dk".format(remain, etaMin),
-            color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text("🎣 BESLENME YUKSEK", color = SirenGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+fun FishingBadge() {
+    val p by SirenNav.pos
+    val lat = p?.latitude ?: 40.0
+    val lon = p?.longitude ?: 27.0
+    val score = FishingCalc.currentScore(lat, lon)
+    if (score < 4) return
+    Box(Modifier.clip(RoundedCornerShape(8.dp)).background(SirenPanel.copy(alpha = 0.9f))
+        .padding(horizontal = 10.dp, vertical = 6.dp)) {
+        Text("🎣 BESLENME YUKSEK", color = SirenGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -148,62 +101,42 @@ fun remainingNmFrom(a: ActiveRouteInfo, cur: GeoPoint): Double {
 }
 
 @Composable
-fun TripComputerCard() {
-    val start by SirenNav.tripStart
-    val dist by SirenNav.tripDistNm
-    val maxSp by SirenNav.maxSpeed
-    val s = start
-    val elapsedMin = if (s != null) (System.currentTimeMillis() - s) / 60000.0 else 0.0
-    val avg = if (elapsedMin > 1) dist / (elapsedMin / 60.0) else 0.0
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(SirenCard).padding(16.dp)) {
-        Text("SEYIR BILGISAYARI", fontSize = 12.sp, letterSpacing = 1.sp, color = SirenTextSecondary)
-        Spacer(Modifier.height(8.dp))
-        Row {
-            TripCell("MESAFE", "%.2f".format(dist), "nm")
-            Spacer(Modifier.width(18.dp))
-            TripCell("ORT HIZ", "%.1f".format(avg), "kts")
-            Spacer(Modifier.width(18.dp))
-            TripCell("MAX HIZ", "%.1f".format(maxSp), "kts")
-            Spacer(Modifier.width(18.dp))
-            TripCell("SURE", "%.0f".format(elapsedMin), "dk")
-        }
-    }
-    Spacer(Modifier.height(16.dp))
-}
-
-@Composable
-private fun TripCell(label: String, value: String, unit: String) {
-    Column {
-        Text(label, fontSize = 9.sp, letterSpacing = 1.sp, color = SirenTextSecondary)
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Spacer(Modifier.width(3.dp))
-            Text(unit, fontSize = 9.sp, color = SirenTextSecondary, modifier = Modifier.padding(bottom = 2.dp))
-        }
+fun FishingBadge() {
+    val p by SirenNav.pos
+    val lat = p?.latitude ?: 40.0
+    val lon = p?.longitude ?: 27.0
+    val score = FishingCalc.currentScore(lat, lon)
+    if (score < 4) return
+    Box(Modifier.clip(RoundedCornerShape(8.dp)).background(SirenPanel.copy(alpha = 0.9f))
+        .padding(horizontal = 10.dp, vertical = 6.dp)) {
+        Text("🎣 BESLENME YUKSEK", color = SirenGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
     }
 }
 
 @Composable
-fun SunCard(pos: MutableState<GeoPoint?>) {
-    val p = pos.value ?: return
-    val key = "${p.latitude.toInt()}_${p.longitude.toInt()}"
-    val times = remember(key) { sunTimesLocal(p.latitude, p.longitude) }
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(SirenCard).padding(16.dp)) {
-        Text("GUNES", fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = SirenTextPrimary)
-        Spacer(Modifier.height(8.dp))
-        Row {
-            Column {
-                Text("GUNDOGUMU", fontSize = 9.sp, color = SirenTextSecondary)
-                Text(times.first, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            }
-            Spacer(Modifier.width(24.dp))
-            Column {
-                Text("GUNBATIMI", fontSize = 9.sp, color = SirenTextSecondary)
-                Text(times.second, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            }
-        }
+fun FishingBadge() {
+    val p by SirenNav.pos
+    val lat = p?.latitude ?: 40.0
+    val lon = p?.longitude ?: 27.0
+    val score = FishingCalc.currentScore(lat, lon)
+    if (score < 4) return
+    Box(Modifier.clip(RoundedCornerShape(8.dp)).background(SirenPanel.copy(alpha = 0.9f))
+        .padding(horizontal = 10.dp, vertical = 6.dp)) {
+        Text("🎣 BESLENME YUKSEK", color = SirenGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
     }
-    Spacer(Modifier.height(12.dp))
+}
+
+@Composable
+fun FishingBadge() {
+    val p by SirenNav.pos
+    val lat = p?.latitude ?: 40.0
+    val lon = p?.longitude ?: 27.0
+    val score = FishingCalc.currentScore(lat, lon)
+    if (score < 4) return
+    Box(Modifier.clip(RoundedCornerShape(8.dp)).background(SirenPanel.copy(alpha = 0.9f))
+        .padding(horizontal = 10.dp, vertical = 6.dp)) {
+        Text("🎣 BESLENME YUKSEK", color = SirenGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+    }
 }
 
 private fun rad(d: Double) = Math.toRadians(d)
