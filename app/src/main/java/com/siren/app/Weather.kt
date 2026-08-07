@@ -51,6 +51,7 @@ data class WeatherData(
     val windDirectionDeg: Double,
     val waveHeightMeters: Double?,
     val temperatureC: Double?,
+    val pressureMsl: Double,
     val hourly: List<HourWeather>,
     val fetchedAt: Long
 )
@@ -76,7 +77,7 @@ object Weather {
     suspend fun fetch(lat: Double, lon: Double): WeatherData? = withContext(Dispatchers.IO) {
         val windBody = httpGet(
             "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
-                "&current=temperature_2m,wind_speed_10m,wind_direction_10mcurrent=temperature_2m,wind_speed_10m,wind_direction_10m,pressure_msl" +
+                "&current=temperature_2m,wind_speed_10m,wind_direction_10m,pressure_msl" +
                 "&hourly=temperature_2m,wind_speed_10m,wind_direction_10m" +
                 "&wind_speed_unit=kn"
         ) ?: return@withContext null
