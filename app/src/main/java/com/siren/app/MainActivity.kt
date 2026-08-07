@@ -870,6 +870,7 @@ fun MapScreen(
         NavDataPanel()
         MobButton()
         ToolsColumn(mapView)
+        BathymetryPanel(mapView)
         NightFilter()
         CurrentArrowsController(mapView)
         HeadingUpController(mapView)
