@@ -128,7 +128,7 @@ fun BoxScope.BathymetryPanel(mapView: MapView) {
         mapView.invalidate()
     }
 
-    Column(Modifier.align(Alignment.TopEnd).padding(end = 8.dp, top = 92.dp)) {
+    Column(Modifier.align(Alignment.TopStart).padding(start = 72.dp, top = 48.dp)) {
         Box(
             Modifier.size(44.dp).clip(RoundedCornerShape(10.dp))
                 .background(SirenPanel.copy(alpha = 0.9f))

@@ -164,6 +164,7 @@ fun FishingBadge() {
     val lat = p?.latitude ?: 40.0
     val lon = p?.longitude ?: 27.0
     val score = FishingCalc.currentScore(lat, lon)
+    if (score < 4) return
     val label = when {
         score >= 4 -> "BESLENME YUKSEK"
         score == 3 -> "BESLENME ORTA"

@@ -76,6 +76,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
@@ -318,7 +319,7 @@ fun SirenRoot() {
         }
     }
 
-    Box(Modifier.fillMaxSize().background(SirenBackground)) {
+    Box(Modifier.fillMaxSize().statusBarsPadding().background(SirenBackground)) {
         Row(Modifier.fillMaxSize()) {
             Spacer(Modifier.width(230.dp))
             Box(Modifier.weight(1f).clipToBounds()) {
