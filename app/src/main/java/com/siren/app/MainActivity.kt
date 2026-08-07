@@ -1106,6 +1106,7 @@ private fun WeatherCard(pos: MutableState<GeoPoint?>) {
                     history.add(now to d.pressureMsl)
                     val sixHoursAgo = now - 6 * 3600 * 1000L
                     SirenNav.pressureHistory.value = history.filter { it.first > sixHoursAgo }
+                    SirenNav.weatherData.value = d
                 }
                 if (data == null) errorMsg = "Hava verisi alinamadi"
             }
