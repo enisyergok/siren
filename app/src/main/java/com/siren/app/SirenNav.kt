@@ -32,6 +32,8 @@ object SirenNav {
     val tripStart = mutableStateOf<Long?>(null)
     val tripDistNm = mutableStateOf(0.0)
     val maxSpeed = mutableStateOf(0f)
+    val pressureMsl = mutableStateOf(Double.NaN)
+    val pressureHistory = mutableStateOf<List<Pair<Long, Double>>>(emptyList())
     private var prevPos: GeoPoint? = null
 
     fun onLocation(p: GeoPoint, speed: Float?, bearing: Float?) {
