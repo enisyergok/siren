@@ -7,7 +7,6 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Bundle
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -22,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -50,8 +50,6 @@ import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.tilesource.TileSourceFactory
 import org.osmdroid.tilesource.XYTileSource
-import org.osmdroid.tilesource.TileSourceFactory
-import org.osmdroid.tilesource.OnlineTileSourceBase
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.MapEventsOverlay
@@ -303,9 +301,9 @@ private fun MobileMap(pos: androidx.compose.runtime.State<GeoPoint?>,
             RailBtn("－") { mapView.controller.zoomOut() }
             RailBtn("🗂️") {
                 srcIdx = (srcIdx + 1) % 2
-                mapView.setTileSource(if (srcIdx == 0) TileSourceFactory.MAPNIK else
-                    OnlineTileSourceBase("Carto", 0, 19, 256, ".png",
-                        arrayOf("https://a.basemaps.cartocdn.com/rastertiles/voyager/")))
+                val cartoTile = XYTileSource("Carto", 0, 19, 256, ".png",
+                    arrayOf("https://a.basemaps.cartocdn.com/rastertiles/voyager/"))
+                mapView.setTileSource(if (srcIdx == 0) TileSourceFactory.MAPNIK else cartoTile)
                 mapView.invalidate()
             }
         }
@@ -494,7 +492,7 @@ private fun FishTabs(pos: androidx.compose.runtime.State<GeoPoint?>, dao: CatchD
 }
 
 @Composable
-private fun MenuPage(db: TrackDb, pos: androidx.compose.runtime.State<GeoPoint?>, C: List<Color>, open: (String) -> Unit) {
+private fun MenuPage(db: AppDatabase, pos: androidx.compose.runtime.State<GeoPoint?>, C: List<Color>, open: (String) -> Unit) {
     Column(
         Modifier.fillMaxSize().padding(bottom = 56.dp).padding(16.dp)
             .verticalScroll(rememberScrollState()),
@@ -519,7 +517,7 @@ private fun MenuBtn(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun SubPage(name: String, db: TrackDb, pos: androidx.compose.runtime.State<GeoPoint?>, C: List<Color>, back: () -> Unit) {
+private fun SubPage(name: String, db: AppDatabase, pos: androidx.compose.runtime.State<GeoPoint?>, C: List<Color>, back: () -> Unit) {
     Column(Modifier.fillMaxSize().background(C[0]).padding(bottom = 56.dp)) {
         Row(Modifier.fillMaxWidth().background(C[1]).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("←", color = C[2], fontSize = 18.sp, fontWeight = FontWeight.Bold,
@@ -527,7 +525,7 @@ private fun SubPage(name: String, db: TrackDb, pos: androidx.compose.runtime.Sta
             Text(name, color = C[3], fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
         when (name) {
-            "WP" -> WaypointsScreen(db.wpDao())
+            "WP" -> WaypointsScreen(db.waypointDao())
             "TRACKS" -> TracksScreen(db.trackDao())
             "AIS" -> AisScreen(pos as androidx.compose.runtime.MutableState<GeoPoint?>)
             "TIDE" -> TideScreen(pos as androidx.compose.runtime.MutableState<GeoPoint?>)
