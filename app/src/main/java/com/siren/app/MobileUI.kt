@@ -10,6 +10,7 @@ import android.os.Bundle
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -36,7 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
@@ -45,21 +45,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.siren.app.TrackDb
 import kotlinx.coroutines.delay
 import org.osmdroid.config.Configuration
-import org.osmdroid.tilesource.TileSourceFactory
-import org.osmdroid.tilesource.OnlineTileSourceBase
 import org.osmdroid.events.MapEventsReceiver
-import org.osmdroid.tilesource.OnlineTileSourceBase
 import org.osmdroid.tilesource.TileSourceFactory
+import org.osmdroid.tilesource.OnlineTileSourceBase
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Overlay
 import org.osmdroid.views.overlay.Polyline
-import androidx.compose.foundation.gestures.detectTapGestures
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -94,7 +90,6 @@ fun MobileRoot() {
     val night by SirenNav.nightMode
     val C = pal(night)
 
-    // GPS
     LaunchedEffect(Unit) {
         val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         val listener = object : LocationListener {
@@ -115,7 +110,6 @@ fun MobileRoot() {
         }
     }
 
-    // Otomatik gece modu
     var autoNight by remember { mutableStateOf(true) }
     LaunchedEffect(autoNight) {
         while (autoNight) {
@@ -138,7 +132,6 @@ fun MobileRoot() {
             SubPage(subPage, db, pos, C) { subPage = "" }
         }
 
-        // Status strip
         Row(
             Modifier.fillMaxWidth().align(Alignment.TopCenter)
                 .background(C[1].copy(alpha = 0.85f))
@@ -167,7 +160,6 @@ fun MobileRoot() {
             }
         }
 
-        // Nav bar
         Row(
             Modifier.fillMaxWidth().align(Alignment.BottomCenter)
                 .background(C[1]).height(56.dp),
@@ -255,7 +247,6 @@ private fun MobileMap(pos: androidx.compose.runtime.State<GeoPoint?>,
         }
     }
 
-    // GPS takip + kayit
     LaunchedEffect(pos.value) {
         pos.value?.let { p ->
             if (locked) mapView.controller.animateTo(p)
@@ -270,7 +261,6 @@ private fun MobileMap(pos: androidx.compose.runtime.State<GeoPoint?>,
         }
     }
 
-    // Uzun bas = imlec bari
     LaunchedEffect(Unit) {
         mapView.overlays.add(MapEventsOverlay(object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean = true
@@ -282,7 +272,6 @@ private fun MobileMap(pos: androidx.compose.runtime.State<GeoPoint?>,
         mapView.overlays.add(BoatOverlay())
     }
 
-    // Olcum cizgisi
     LaunchedEffect(SirenNav.measureA.value, SirenNav.measureB.value) {
         val a = SirenNav.measureA.value; val b = SirenNav.measureB.value
         if (a != null && b != null) {
@@ -303,14 +292,13 @@ private fun MobileMap(pos: androidx.compose.runtime.State<GeoPoint?>,
         ToolsColumn(mapView)
         RegionFishPanel()
 
-        // Sag rail
         Column(
             Modifier.align(Alignment.TopEnd).padding(end = 8.dp, top = 40.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             RailBtn("🎯") { locked = true; pos.value?.let { mapView.controller.animateTo(it) } }
-            RailBtn("＋") { mapView.controller.zoomIn(); }
-            RailBtn("－") { mapView.controller.zoomOut(); }
+            RailBtn("＋") { mapView.controller.zoomIn() }
+            RailBtn("－") { mapView.controller.zoomOut() }
             RailBtn("🗂️") {
                 srcIdx = (srcIdx + 1) % 2
                 mapView.setTileSource(if (srcIdx == 0) TileSourceFactory.MAPNIK else
@@ -320,7 +308,6 @@ private fun MobileMap(pos: androidx.compose.runtime.State<GeoPoint?>,
             }
         }
 
-        // FAB kumesi
         Row(
             Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 64.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -328,7 +315,7 @@ private fun MobileMap(pos: androidx.compose.runtime.State<GeoPoint?>,
         ) {
             Box(Modifier.size(40.dp).clip(CircleShape).background(SirenRed)
                 .pointerInput(Unit) {
-                    androidx.compose.foundation.gestures.detectTapGestures(onLongPress = {
+                    detectTapGestures(onLongPress = {
                         SirenNav.mob.value = SirenNav.pos.value
                     })
                 }, contentAlignment = Alignment.Center) { Text("SOS", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
@@ -338,7 +325,6 @@ private fun MobileMap(pos: androidx.compose.runtime.State<GeoPoint?>,
                 .clickable { recording = !recording }, contentAlignment = Alignment.Center) { Text("●", color = Color.White, fontSize = 20.sp) }
         }
 
-        // Imlec bari
         if (cursor.value != null) {
             val cp = cursor.value!!
             Row(
@@ -388,7 +374,6 @@ private fun MobileMap(pos: androidx.compose.runtime.State<GeoPoint?>,
             }
         }
 
-        // Enstruman bari
         InstrumentBar(pos, speed, course, C)
     }
 
@@ -428,20 +413,20 @@ private fun BoxScope.InstrumentBar(pos: androidx.compose.runtime.State<GeoPoint?
     }
 
     fun valOf(key: String): Pair<String, Color> = when (key) {
-        "SOG" -> "%.1f".format(speed.value ?: 0f) to C[3]
-        "COG" -> "%.0f°".format(course.value ?: 0f) to C[3]
-        "HDG" -> "%.0f°".format(SirenNav.heading.value ?: 0f) to C[3]
-        "XTE" -> if (abs(xte) > 0.05) "%.0fm".format(abs(xte) * 1852) to SirenRed else "%.0fm".format(abs(xte) * 1852) to SirenGreen
-        "VMG" -> "%.1f".format(vmg) to if (vmg > 0.5) SirenGreen else SirenTrackYellow
-        "BTW" -> "%.0f°".format(btw) to C[3]
-        "DTW" -> "%.2f".format(dtw) to C[3]
-        "TTG" -> if (vmg > 0.3) "%.0fdk".format(dtw / vmg * 60) else "--" to C[3]
+        "SOG" -> Pair("%.1f".format(speed.value ?: 0f), C[3])
+        "COG" -> Pair("%.0f°".format(course.value ?: 0f), C[3])
+        "HDG" -> Pair("%.0f°".format(SirenNav.heading.value ?: 0f), C[3])
+        "XTE" -> if (abs(xte) > 0.05) Pair("%.0fm".format(abs(xte) * 1852), SirenRed) else Pair("%.0fm".format(abs(xte) * 1852), SirenGreen)
+        "VMG" -> Pair("%.1f".format(vmg), if (vmg > 0.5) SirenGreen else SirenTrackYellow)
+        "BTW" -> Pair("%.0f°".format(btw), C[3])
+        "DTW" -> Pair("%.2f".format(dtw), C[3])
+        "TTG" -> if (vmg > 0.3) Pair("%.0fdk".format(dtw / vmg * 60), C[3]) else Pair("--", C[3])
         "ETA" -> {
             val t = if (vmg > 0.3) System.currentTimeMillis() + (dtw / vmg * 3600000).toLong() else 0L
-            if (t > 0) SimpleDateFormat("HH:mm", Locale("tr")).format(Date(t)) else "--" to C[3]
+            if (t > 0) Pair(SimpleDateFormat("HH:mm", Locale("tr")).format(Date(t)), C[3]) else Pair("--", C[3])
         }
-        "TRIP" -> "%.1f".format(SirenNav.tripDistNm.value) to C[3]
-        "MAX" -> "%.1f".format(SirenNav.maxSpeed.value) to C[3]
+        "TRIP" -> Pair("%.1f".format(SirenNav.tripDistNm.value), C[3])
+        "MAX" -> Pair("%.1f".format(SirenNav.maxSpeed.value), C[3])
         else -> Pair(if (ar != null) "SEYIR" else "BOS", C[2])
     }
 
@@ -453,9 +438,9 @@ private fun BoxScope.InstrumentBar(pos: androidx.compose.runtime.State<GeoPoint?
             cells.forEachIndexed { i, key ->
                 val v = valOf(key)
                 Column(
-                    Modifier.clickable { }
+                    Modifier.weight(1f).clickable { }
                         .pointerInput(Unit) {
-                            androidx.compose.foundation.gestures.detectTapGestures(onLongPress = { editSlot = i })
+                            detectTapGestures(onLongPress = { editSlot = i })
                         },
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
