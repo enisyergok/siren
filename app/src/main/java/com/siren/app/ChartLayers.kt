@@ -30,35 +30,26 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import org.osmdroid.tileprovider.MapTile
 import org.osmdroid.tileprovider.MapTileProviderBasic
+import org.osmdroid.tilesource.TileSourceFactory
 import org.osmdroid.tilesource.XYTileSource
 import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.tiles.TilesOverlay
+import org.osmdroid.views.overlay.TilesOverlay
 import java.net.HttpURLConnection
 import java.net.URL
 
-// Esri servisi z/y/x sirasi kullanir - osmdroid z/x/y; bu sinif sirayi cevirir
-class ZYXTileSource(name: String, private val urls: Array<String>, maxZoom: Int) :
-    XYTileSource(name, 0, maxZoom, 256, ".png", urls) {
-    override fun getTileURLString(aTile: MapTile): String {
-        val base = urls[Math.abs(aTile.hashCode()) % urls.size]
-        return base + aTile.zoomLevel + "/" + aTile.y + "/" + aTile.x + ".png"
-    }
-}
-
 object ChartLayers {
-    val ESRI_OCEAN = ZYXTileSource("EsriOcean",
-        arrayOf("https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/Ocean_Basemap/MapServer/tile/"), 16)
-    val ESRI_SAT = ZYXTileSource("EsriImagery",
-        arrayOf("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/"), 18)
+    val ESRI_OCEAN = XYTileSource("EsriOcean", 0, 16, 256, ".png",
+        arrayOf("https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/Ocean_Basemap/MapServer/tile/"))
+    val ESRI_SAT = XYTileSource("EsriImagery", 0, 18, 256, ".png",
+        arrayOf("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/"))
 
     fun seamarkSource() = XYTileSource("OpenSeaMap", 0, 18, 256, ".png",
         arrayOf("https://tiles.openseamap.org/seamark/"))
 
     fun makeOverlay(ctx: Context, src: XYTileSource): TilesOverlay {
         val provider = MapTileProviderBasic(ctx)
-        provider.setTileSource(src)
+        provider.tileSource = src
         val ov = TilesOverlay(provider, ctx)
         ov.loadingBackgroundColor = android.graphics.Color.TRANSPARENT
         return ov
@@ -69,7 +60,7 @@ object ChartLayers {
 fun BoxScope.LayerPanelButton(mapView: MapView) {
     val context = LocalContext.current
     var open by remember { mutableStateOf(false) }
-    var base by remember { mutableStateOf(0) }          // 0 deniz, 1 uydu, 2 osm
+    var base by remember { mutableStateOf(0) }
     var seamark by remember { mutableStateOf(true) }
     var radar by remember { mutableStateOf(false) }
     var seamarkOv by remember { mutableStateOf<TilesOverlay?>(null) }
@@ -80,7 +71,7 @@ fun BoxScope.LayerPanelButton(mapView: MapView) {
         mapView.setTileSource(when (i) {
             0 -> ChartLayers.ESRI_OCEAN
             1 -> ChartLayers.ESRI_SAT
-            else -> org.osmdroid.tilesource.TileSourceFactory.MAPNIK
+            else -> TileSourceFactory.MAPNIK
         })
         mapView.invalidate()
     }
@@ -96,7 +87,6 @@ fun BoxScope.LayerPanelButton(mapView: MapView) {
         mapView.invalidate()
     }
 
-    // Radar: RainViewer canli yagis
     LaunchedEffect(radar) {
         radarOv?.let { mapView.overlays.remove(it); radarOv = null }
         if (!radar) { mapView.invalidate(); return@LaunchedEffect }
@@ -125,7 +115,6 @@ fun BoxScope.LayerPanelButton(mapView: MapView) {
         }
     }
 
-    // Ilk acilista deniz isaretlerini ac
     LaunchedEffect(Unit) { setSeamark(true); applyBase(0) }
 
     Column(Modifier.align(Alignment.TopEnd).padding(end = 8.dp, top = 44.dp)) {
