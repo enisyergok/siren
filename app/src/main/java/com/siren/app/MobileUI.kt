@@ -49,6 +49,8 @@ import kotlinx.coroutines.delay
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.tilesource.TileSourceFactory
+import org.osmdroid.tilesource.XYTileSource
+import org.osmdroid.tilesource.TileSourceFactory
 import org.osmdroid.tilesource.OnlineTileSourceBase
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
@@ -76,7 +78,7 @@ else
 @Composable
 fun MobileRoot() {
     val context = LocalContext.current
-    val db = remember { TrackDb.getInstance(context) }
+    val db = remember { AppDatabase.getInstance(context) }
     LaunchedEffect(Unit) {
         SirenNav.routeDao = db.routeDao()
         SirenNav.catchDao = db.catchDao()
