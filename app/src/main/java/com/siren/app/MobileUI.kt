@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -49,7 +48,6 @@ import kotlinx.coroutines.delay
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.tilesource.TileSourceFactory
-import org.osmdroid.tilesource.XYTileSource
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.MapEventsOverlay
@@ -228,7 +226,7 @@ private fun MobileMap(pos: androidx.compose.runtime.State<GeoPoint?>,
                       C: List<Color>) {
     val context = LocalContext.current
     var locked by remember { mutableStateOf(true) }
-    var srcIdx by remember { mutableStateOf(0) }
+    // Harita kaynagi sabit
     val cursor = remember { mutableStateOf<GeoPoint?>(null) }
     var showCatchDlg by remember { mutableStateOf(false) }
     var infoTxt by remember { mutableStateOf("") }
@@ -300,10 +298,10 @@ private fun MobileMap(pos: androidx.compose.runtime.State<GeoPoint?>,
             RailBtn("＋") { mapView.controller.zoomIn() }
             RailBtn("－") { mapView.controller.zoomOut() }
             RailBtn("🗂️") {
-                srcIdx = (srcIdx + 1) % 2
-                val cartoTile = XYTileSource("Carto", 0, 19, 256, ".png",
-                    arrayOf("https://a.basemaps.cartocdn.com/rastertiles/voyager/"))
-                mapView.setTileSource(if (srcIdx == 0) TileSourceFactory.MAPNIK else cartoTile)
+                // Tek kaynak kullaniliyor
+                // Tek harita kaynagi (OSM)
+                    
+                mapView.setTileSource(TileSourceFactory.MAPNIK)
                 mapView.invalidate()
             }
         }
