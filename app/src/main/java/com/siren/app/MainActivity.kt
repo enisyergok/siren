@@ -224,7 +224,7 @@ fun routeTotalNm(points: List<GeoPoint>): Double {
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { SirenTheme { AdaptiveRoot() } }
+        setContent { SirenTheme { SirenRoot() } }
     }
 }
 
