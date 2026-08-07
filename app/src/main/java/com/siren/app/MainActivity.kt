@@ -1098,6 +1098,14 @@ private fun WeatherCard(pos: MutableState<GeoPoint?>) {
             val needRefresh = data == null || (now - data!!.fetchedAt) > 30 * 60 * 1000L
             if (needRefresh) {
                 data = Weather.fetch(p.latitude, p.longitude)
+                data?.let { d ->
+                    SirenNav.pressureMsl.value = d.pressureMsl
+                    val now = System.currentTimeMillis()
+                    val history = SirenNav.pressureHistory.value.toMutableList()
+                    history.add(now to d.pressureMsl)
+                    val sixHoursAgo = now - 6 * 3600 * 1000L
+                    SirenNav.pressureHistory.value = history.filter { it.first > sixHoursAgo }
+                }
                 if (data == null) errorMsg = "Hava verisi alinamadi"
             }
         }

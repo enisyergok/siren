@@ -36,6 +36,41 @@ import kotlin.math.sin
 import kotlin.math.tan
 
 object FishingCalc {
+    fun pressureTrend(): String {
+        val current = SirenNav.pressureMsl.value
+        if (current.isNaN()) return "VERI YOK"
+        
+        val history = SirenNav.pressureHistory.value
+        if (history.size < 2) return "VERI YETERSIZ"
+        
+        val oldest = history.first()
+        val now = System.currentTimeMillis()
+        val hoursElapsed = (now - oldest.first) / 3600000.0
+        
+        if (hoursElapsed < 0.5) return "VERI YETERSIZ"
+        
+        val change = current - oldest.second
+        val changePerHour = change / hoursElapsed
+        
+        return when {
+            changePerHour < -1.0 -> "HIZLA DUSUYOR"
+            changePerHour < -0.3 -> "DUSUYOR"
+            changePerHour > 1.0 -> "HIZLA YUKSELIYOR"
+            changePerHour > 0.3 -> "YUKSELIYOR"
+            else -> "SABIT"
+        }
+    }
+
+    fun pressureScore(): Int {
+        return when (pressureTrend()) {
+            "HIZLA DUSUYOR" -> 2
+            "DUSUYOR" -> 1
+            "SABIT" -> 1
+            "YUKSELIYOR" -> -1
+            "HIZLA YUKSELIYOR" -> -2
+            else -> 0
+        }
+    }
     const val SYNODIC = 29.53058867
     private const val NEW_MOON_EPOCH = 947182440000.0
 
@@ -106,7 +141,9 @@ object FishingCalc {
         if (abs(hUt - minor1) < 1.0 || abs(hUt - minor2) < 1.0) s += 1
         val night = !sr.isNaN() && !ss.isNaN() && (hUt > ss || hUt < sr)
         if (night && illumination(age) > 0.5) s += 1
-        return s.coerceAtMost(5)
+    val baseScore = s.coerceAtMost(5)
+        val pressureModifier = pressureScore()
+        return (baseScore + pressureModifier).coerceIn(0, 5)
     }
 
     fun currentScore(lat: Double, lon: Double): Int {
