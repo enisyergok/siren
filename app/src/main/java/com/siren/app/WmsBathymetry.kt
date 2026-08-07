@@ -25,9 +25,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.osmdroid.tileprovider.MapTile
 import org.osmdroid.tileprovider.MapTileProviderBasic
-import org.osmdroid.tilesource.OnlineTileSourceBase
+import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
+import org.osmdroid.util.MapTileIndex
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.TilesOverlay
 
@@ -41,12 +41,11 @@ class WmsTileSource(
     private val styles: String = ""
 ) : OnlineTileSourceBase(name, minZoom, maxZoom, 256, ".png", arrayOf(wmsUrl)) {
 
-    override fun getTileURLString(aTile: MapTile): String {
-        val x = aTile.x
-        val y = aTile.y
-        val z = aTile.zoomLevel
+    override fun getTileURLString(pMapTileIndex: Long): String {
+        val x = MapTileIndex.getX(pMapTileIndex)
+        val y = MapTileIndex.getY(pMapTileIndex)
+        val z = MapTileIndex.getZoom(pMapTileIndex)
 
-        // XYZ tile -> WGS84 bbox dönüşümü
         val n = Math.pow(2.0, z.toDouble())
         val minLon = x / n * 360.0 - 180.0
         val maxLon = (x + 1) / n * 360.0 - 180.0
@@ -73,7 +72,6 @@ class WmsTileSource(
 }
 
 object BathymetryLayers {
-    // EMODnet: Akdeniz/Ege/Karadeniz dahil ~115m çözünürlük (öncelikli)
     val EMODNET = WmsTileSource(
         name = "EMODnet",
         minZoom = 1,
@@ -82,7 +80,6 @@ object BathymetryLayers {
         layers = "emodnet_bathymetry"
     )
 
-    // GEBCO: Küresel ~450m çözünürlük (yedek)
     val GEBCO = WmsTileSource(
         name = "GEBCO",
         minZoom = 1,
