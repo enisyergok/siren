@@ -158,28 +158,6 @@ object FishingCalc {
             .sortedBy { it.first }
 }
 
-@Composable
-fun FishingBadge() {
-    val p by SirenNav.pos
-    val lat = p?.latitude ?: 40.0
-    val lon = p?.longitude ?: 27.0
-    val score = FishingCalc.currentScore(lat, lon)
-    if (score < 4) return
-    val label = when {
-        score >= 4 -> "BESLENME YUKSEK"
-        score == 3 -> "BESLENME ORTA"
-        else -> "BESLENME DUSUK"
-    }
-    val color = when {
-        score >= 4 -> SirenGreen
-        score == 3 -> SirenTrackYellow
-        else -> SirenTextSecondary
-    }
-    Box(Modifier.clip(RoundedCornerShape(8.dp)).background(SirenPanel.copy(alpha = 0.9f))
-        .padding(horizontal = 10.dp, vertical = 6.dp)) {
-        Text("🎣 $label", color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-    }
-}
 
 @Composable
 fun FishingForecastCard(pos: MutableState<GeoPoint?>) {
